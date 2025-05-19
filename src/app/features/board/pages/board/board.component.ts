@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, HostListener, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, Renderer2, ViewChild, NgZone } from '@angular/core';
 import { ActivatedRoute, RouterModule, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { HttpClient } from '@angular/common/http';
@@ -12,6 +12,8 @@ import { BoardService } from '@shared-services/board/board.service';
 import { NavbarComponent } from '../../components/navbar/navbar.component';
 import { BoardDataService } from '@shared-services/board-data/board-data.service';
 import { CookiesService } from '@core-services/cookies/cookies.service';
+import { Subject, debounceTime, fromEvent, takeUntil } from 'rxjs';
+import { ImageUploadModalComponent } from '../../components/image-upload-modal/image-upload-modal.component';
 
 @Component({ selector: 'board',
     standalone: true,
@@ -26,12 +28,15 @@ import { CookiesService } from '@core-services/cookies/cookies.service';
       ToolboxComponent,
       ControlpanComponent,
       NavbarComponent,
-      RouterModule
+      RouterModule,
+      ImageUploadModalComponent
     ],
     providers: [HttpClient]
   })
 
-export class BoardComponent implements AfterViewInit, OnInit{
+export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
+  private autoSaveDebouncer$ = new Subject<void>();
 
   @ViewChild('main', {static: true}) container!: ElementRef<HTMLElement>;
   @ViewChild('toolbox', {static: true}) toolbox!: ElementRef<HTMLElement>;
@@ -100,60 +105,61 @@ export class BoardComponent implements AfterViewInit, OnInit{
   }
 
   initEvents() {
-    this.renderer.listen(document, 'pointerup',this.boardService.pointerUp)
+    this.ngZone.runOutsideAngular(() => {
+      this.renderer.listen(document, 'pointerup', this.boardService.pointerUp);
 
+      this.renderer.listen(this.boardContainer.nativeElement,
+        'pointerdown',
+        (event: PointerEvent) => {
+          this.ngZone.run(() => {
+            if(event.button != 2) this.boardService.contextMenu.show = false;
+            this.boardService.contextMenu.show = false;
+            this.boardService.pointerDown(event, this.nodeService, this.renderer, this.boardContainer.nativeElement);
+          });
+      });
 
-    this.renderer.listen(this.boardContainer.nativeElement,
-      'pointerdown',
-      (event: PointerEvent)=>{
-        if(event.button != 2) this.boardService.contextMenu.show = false;
-        this.boardService.contextMenu.show = false
-        this.boardService.pointerDown(event,this.nodeService,this.renderer, this.boardContainer.nativeElement)
-    })
+      this.renderer.listen(this.boardContainer.nativeElement,
+        'pointerup',
+        (event: PointerEvent) => {
+          this.ngZone.run(() => {
+            this.boardService.pointerUpBoard(event, this.nodeService, this.renderer);
+          });
+      });
 
-    this.renderer.listen(this.boardContainer.nativeElement,
-      'pointerup',
-      (event: PointerEvent)=>{
-        this.boardService.pointerUpBoard(event,this.nodeService, this.renderer);
-    })
+      this.renderer.listen(this.boardContainer.nativeElement, 'wheel', this.boardService.zoom);
 
-    this.renderer.listen(this.boardContainer.nativeElement,'wheel', this.boardService.zoom);
+      this.renderer.listen(this.boardContainer.nativeElement,
+        'dragover',
+        (event: DragEvent) => {
+          this.ngZone.run(() => {
+            this.boardService.droppable = true;
+            this.boardService.dragOverBoard(event);
+          });
+      });
 
-    this.renderer.listen(this.boardContainer.nativeElement,
-      'dragover',
-      (event: DragEvent)=>{
-      this.boardService.droppable = true;
-      this.boardService.dragOverBoard(event)
+      this.renderer.listen(window, 'keydown', (event: KeyboardEvent) => {
+        this.ngZone.run(() => {
+          this.boardService.keydown(event);
+          if(event.code === "Space") this.boardContainer.nativeElement.style.cursor = 'grab';
+        });
+      });
+
+      this.renderer.listen(window, 'keyup', (event: KeyboardEvent) => {
+        this.ngZone.run(() => {
+          this.boardService.keyup(event);
+          if(event.code === "Space") this.boardContainer.nativeElement.style.cursor = '';
+        });
+      });
+
+      this.renderer.listen(this.boardContainer.nativeElement, 'contextmenu', (event: MouseEvent) => {
+        this.ngZone.run(() => {
+          event.preventDefault();
+          this.boardService.contextMenu.show = true;
+          this.boardService.contextMenu.x = event.clientX;
+          this.boardService.contextMenu.y = event.clientY;
+        });
+      });
     });
-
-    this.renderer.listen(this.boardContainer.nativeElement,
-      'drop',
-      (event: DragEvent)=>{
-        this.boardService.dropNode(event,this.nodeService,this.container, this.renderer)
-    });
-
-    this.renderer.listen(window,'keydown',(event:KeyboardEvent)=>{
-      this.boardService.keydown(event);
-      if(event.code === "Space") this.boardContainer.nativeElement .style.cursor = 'grab'
-    })
-
-    this.renderer.listen(window,'keyup',(event:KeyboardEvent)=>{
-      this.boardService.keyup(event);
-      if(event.code === "Space") this.boardContainer.nativeElement .style.cursor = ''
-    })
-
-
-    this.renderer.listen(this.boardContainer.nativeElement,'contextmenu',(event: MouseEvent)=>{
-      event.preventDefault()
-      this.boardService.contextMenu.show = true;
-
-      this.boardService.contextMenu.x = event.clientX
-      this.boardService.contextMenu.y = event.clientY
-      if(!(event.target instanceof Element)) return;
-
-    })
-
-
   }
 
   constructor(
@@ -162,24 +168,194 @@ export class BoardComponent implements AfterViewInit, OnInit{
     public nodeService: NodeService,
     public boardService: BoardService,
     public boardData: BoardDataService,
-    private cookiesService: CookiesService) {
+    private cookiesService: CookiesService,
+    private ngZone: NgZone
+  ) {
+    boardService.appRenderer = renderer;
 
-      boardService.appRenderer = renderer
-    }
+    // Setup auto-save with debounce
+    this.autoSaveDebouncer$
+      .pipe(
+        debounceTime(2000), // Wait 2 seconds after last change
+        takeUntil(this.destroy$)
+      )
+      .subscribe(() => {
+        this.ngZone.run(() => {
+          this.boardData.saveData();
+        });
+      });
+  }
 
   ngOnInit(): void {
+    // Clear any existing state
     this.nodeService.clearActiveConnection();
     this.nodeService.clearActiveNote(this.renderer);
+
+    // Use NgZone to ensure proper change detection
+    this.ngZone.runOutsideAngular(() => {
+      // Listen for board changes that should trigger auto-save
+      fromEvent(document, 'mouseup')
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.ngZone.run(() => this.triggerAutoSave());
+        });
+
+      // Listen for board changes that should trigger auto-save
+      fromEvent(document, 'keyup')
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.ngZone.run(() => this.triggerAutoSave());
+        });
+    });
+
+    // Add window unload handler
+    window.addEventListener('beforeunload', this.beforeUnloadHander.bind(this));
   }
 
-  ngAfterViewInit(): void {
-    this.boardService.init(this.container, this.nodeService, this.boardData, this.renderer);
-    this.boardData.renderer = this.renderer;
-    this.boardData.checkData(this.renderer);
-    this.initEvents();
-    this.boardService.disablePanzoom()
-    this.boardService.enablePanzoom()
+  async ngAfterViewInit() {
+    // Use NgZone to ensure proper initialization
+    this.ngZone.runOutsideAngular(async () => {
+      try {
+        // Wait for container to be available
+        if (!this.container?.nativeElement) {
+          console.error('Container not initialized');
+          return;
+        }
 
+        // Set container in NodeService
+        this.nodeService.setContainer(this.container.nativeElement);
+
+        // Initialize board service
+        await this.boardService.init(this.container, this.nodeService, this.boardData, this.renderer);
+        this.boardData.renderer = this.renderer;
+        
+        // Load board data
+        await this.boardData.checkData(this.renderer);
+        
+        // Initialize events
+        this.initEvents();
+        
+        // Initialize panzoom
+        this.boardService.disablePanzoom();
+        this.boardService.enablePanzoom();
+
+        // Force a redraw of connections
+        setTimeout(() => {
+          if (this.boardService.instance) {
+            this.boardService.instance.repaintEverything();
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Error initializing board:', error);
+      }
+    });
   }
 
+  ngOnDestroy() {
+    // Remove window unload handler
+    window.removeEventListener('beforeunload', this.beforeUnloadHander.bind(this));
+
+    // Save data before destroying
+    this.boardData.saveData().then(() => {
+      // Clean up board service
+      if (this.boardService.instance) {
+        try {
+          this.boardService.instance.reset();
+        } catch (error) {
+          console.error('Error resetting board instance:', error);
+        }
+      }
+      
+      if (this.boardService.panzoom) {
+        try {
+          this.boardService.panzoom.destroy();
+        } catch (error) {
+          console.error('Error destroying panzoom:', error);
+        }
+      }
+      
+      // Clear active nodes and connections
+      this.nodeService.clearActiveConnection();
+      this.nodeService.clearActiveNote(this.renderer);
+      
+      // Clear any remaining event listeners
+      this.destroy$.next();
+      this.destroy$.complete();
+    }).catch(error => {
+      console.error('Error during board cleanup:', error);
+      // Still try to clean up even if save fails
+      this.destroy$.next();
+      this.destroy$.complete();
+    });
+  }
+
+  private triggerAutoSave() {
+    if (!this.destroy$.closed) {
+      this.autoSaveDebouncer$.next();
+    }
+  }
+
+  showImageModal = false;
+  dropPosition = { x: 0, y: 0 };
+
+  @HostListener('drop', ['$event'])
+  onDrop(event: DragEvent) {
+    event.preventDefault();
+    const type = event.dataTransfer?.getData('text');
+    if (type === 'image') {
+      // Store drop position
+      const rect = this.boardContainer.nativeElement.getBoundingClientRect();
+      this.dropPosition = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+      // Show modal instead of immediate upload
+      this.showImageModal = true;
+      return;
+    }
+    // Fallback to existing dropNode logic
+    this.boardService.dropNode(event, this.nodeService, this.container, this.renderer);
+  }
+
+  onImageSelected(imageUrl: string) {
+    if (!imageUrl) return;
+    
+    try {
+      // Calculate position considering zoom and pan
+      const x = this.dropPosition.x;
+      const y = this.dropPosition.y;
+      
+      // Ensure container and board service are initialized
+      if (!this.container?.nativeElement) {
+        console.error('Container element not found');
+        return;
+      }
+
+      if (!this.boardService.instance) {
+        console.error('Board service not initialized');
+        return;
+      }
+
+      // Create the image node
+      const nodeId = this.nodeService.createNodeWithImage(
+        x,
+        y,
+        imageUrl,
+        this.renderer,
+        false
+      );
+
+      if (nodeId) {
+        console.log('Image node created successfully:', nodeId);
+      }
+
+      this.showImageModal = false;
+    } catch (error) {
+      console.error('Error creating image node:', error);
+    }
+  }
+
+  closeImageModal() {
+    this.showImageModal = false;
+  }
 }

@@ -1,10 +1,10 @@
-
 import { SavedNode } from "./saved-node";
 import { SavedConnection } from "./saved-connection";
 import { Tag } from "./tag";
 
 export interface Board {
   id: string,
+  projectId?: string,
   dateCreated: Date,
   connetions: SavedConnection[],
   name: string,

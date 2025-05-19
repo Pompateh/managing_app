@@ -1,13 +1,26 @@
 <div class="dragDiv nodeElement"></div>
 <div class="fadeDiv nodeElement"></div>
-<div class="resizeButton nodeElement">
+<!-- Resize Button: always visible -->
+<div class="resizeButton nodeElement" style="z-index:2;">
   <mat-icon style="width: 70%; align-self: center;" svgIcon="resize"></mat-icon>
 </div>
 <div class="linkActionButton nodeElement">
-  <div class="linkAction absolute h-full w-full z-10 bg-transparent">
-  </div>
+  <div class="linkAction absolute h-full w-full z-10 bg-transparent"></div>
   <mat-icon class="linkAction absolute" style="width: 80%;" svgIcon="link"></mat-icon>
 </div>
-<textarea class="desc nodeElement" readonly disabled="true" [value]="innerTextarea" placeholder="Double click to type..."></textarea>
+
+<!-- Show image if present, otherwise textarea -->
+<ng-container *ngIf="imageSrc; else textNode">
+  <div class="image-container">
+    <img
+      [src]="imageSrc"
+      alt="Board Image"
+      class="node-image"
+    />
+  </div>
+</ng-container>
+<ng-template #textNode>
+  <textarea class="desc nodeElement" readonly disabled="true" [value]="innerTextarea" placeholder="Double click to type..."></textarea>
+</ng-template>
 
 

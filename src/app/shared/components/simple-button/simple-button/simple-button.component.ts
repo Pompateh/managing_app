@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { MatIcon, MatIconModule } from '@angular/material/icon';
+import { MatIconModule } from '@angular/material/icon';
 import { RouterModule } from '@angular/router';
 import { IconService } from '@shared-services/icon/icon.service';
 
@@ -10,12 +10,12 @@ import { IconService } from '@shared-services/icon/icon.service';
   imports: [
     RouterModule,
     CommonModule,
-    MatIcon
+    MatIconModule
   ],
   templateUrl: './simple-button.component.html',
   styleUrl: './simple-button.component.scss'
 })
-export class SimpleButtonComponent{
+export class SimpleButtonComponent {
   @Input() routerLink?: string;
   @Input() url?: string;
   @Input() id?: string;
@@ -29,5 +29,5 @@ export class SimpleButtonComponent{
   @Output('click') click = new EventEmitter<Event>();
   @Input() icon?: string;
 
-  constructor(iconService: IconService){}
+  constructor(iconService: IconService) {}
 }

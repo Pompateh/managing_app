@@ -45,55 +45,94 @@ export class BoardDataService implements OnInit{
     private cookieService: CookieService,
     private cookiesService: CookiesService,
   ) {
-    this.activatedRoute.queryParamMap.subscribe((p)=>{
-      this.activeId = p.get("id") ?? '';
-      const selectedBoard = this.boards.find(e=>e.id===this.activeId);
-
-      if(selectedBoard) {
-        this.activeBoard = selectedBoard;
+    // Initialize boards array
+    this._boards = [];
+    
+    // Subscribe to route changes
+    this.activatedRoute.queryParamMap.subscribe((p) => {
+      const newId = p.get("id") ?? '';
+      if (newId !== this.activeId) {
+        this.activeId = newId;
+        const selectedBoard = this.boards.find(e => e.id === this.activeId);
+        if (selectedBoard) {
+          this.activeBoard = selectedBoard;
+        }
       }
-    })
+    });
 
-
-
-    this.loadBoards();
+    // Load boards with error handling
+    this.loadBoards().catch(error => {
+      console.error('Error loading boards:', error);
+    });
   }
 
   async deleteAll() {
     db.boards.clear();
   }
 
-  loadBoards() {
-    this.getBoards().then((res)=>{
-      this.boards = res;
-      this.checkData(this.renderer)
-    });
+  async loadBoards() {
+    try {
+      const boards = await this.getBoards();
+      this.boards = boards;
+      
+      // Set active board based on route params and project ID
+      const id = this.activatedRoute.snapshot.queryParamMap.get('id');
+      const projectId = history.state?.projectId;
+      
+      if (id) {
+        const selectedBoard = projectId 
+          ? this.getBoard(id, projectId)
+          : this.getBoard(id);
+          
+        if (selectedBoard) {
+          this.activeBoard = selectedBoard;
+          this.activeId = id;
+        }
+      }
+      
+      if (this.renderer) {
+        this.checkData(this.renderer);
+      }
+    } catch (error) {
+      console.error('Error in loadBoards:', error);
+      throw error;
+    }
   }
 
   async getBoards():Promise<Board[]> {
-    return await db.boards.toArray()
+    const boards = await db.boards.toArray();
+    return boards;
   }
 
-  getBoard(id:string) {
-    return this.boards.find(e=>e.id===id);
+  getBoard(id: string, projectId?: string) {
+    if (projectId) {
+      return this.boards.find(e => e.id === id && e.projectId === projectId);
+    }
+    return this.boards.find(e => e.id === id);
   }
 
-  checkData( renderer: Renderer2) {
-    if(!this.cookiesService.accepted) return
-    const id = this.activatedRoute.snapshot.queryParamMap.get('id') ?? ''
-    const activeBoard: Board | undefined = this.getData(id)
+  getBoardsByProject(projectId: string): Board[] {
+    return this.boards.filter(board => board.projectId === projectId);
+  }
+
+  async checkData(renderer: Renderer2) {
+    if(!this.cookiesService.accepted) return;
+    const id = this.activatedRoute.snapshot.queryParamMap.get('id') ?? '';
+    const activeBoard: Board | undefined = this.getData(id);
 
     if(activeBoard) {
+      // Restore zoom and pan first
       const scale = activeBoard.zoomScale;
-      this.boardService.zoomScale = scale
+      this.boardService.zoomScale = scale;
       this.boardService.panzoom.zoom(scale);
       this.boardService.instance.setZoom(scale);
-      this.boardService.translation = this.boardService.panzoom.getPan()
+      this.boardService.translation = this.boardService.panzoom.getPan();
 
+      // Restore nodes (positions/sizes are set directly)
       if(activeBoard.elements) {
-        activeBoard.elements.forEach((e:SavedNode)=>{
-          const x = e.x * activeBoard.zoomScale;
-          const y = e.y * activeBoard.zoomScale;
+        const nodePromises = activeBoard.elements.map(async (e: SavedNode) => {
+          const x = e.x;
+          const y = e.y;
           const width = e.width;
           const height = e.height;
           const color = e.color;
@@ -101,94 +140,95 @@ export class BoardDataService implements OnInit{
           const type = e.type;
           const nodeId = e.id;
 
-          this.nodeService.loadNode(x,y,width,height,color,innerText,type,renderer,nodeId)
-        })
+          if (e.imageSrc) {
+            return this.nodeService.createNodeWithImage(x, y, e.imageSrc, renderer, false, width, height, nodeId);
+          } else {
+            return this.nodeService.loadNode(x, y, width, height, color, innerText, type, renderer, nodeId);
+          }
+        });
+        await Promise.all(nodePromises);
       }
 
+      // Now clear only connections, not nodes
       if(activeBoard.connetions) {
-        activeBoard.connetions.forEach((c: SavedConnection)=>{
+        const managedElements = this.boardService.instance.getManagedElements();
+        this.boardService.instance.deleteEveryConnection();
+        activeBoard.connetions.forEach((c: SavedConnection) => {
+          const sourceEl = this.boardService.instance.getManagedElement(c.sourceId);
+          const targetEl = this.boardService.instance.getManagedElement(c.targetId);
           let source;
-          try { //? Check if source element is a group, since the group Id and Element Id are different
-            source = this.boardService.instance.getGroup(c.sourceId).el;
+          try {
+            source = this.boardService.instance.getGroup(c.sourceId)?.el;
           } catch (error) {
-            source = this.boardService.instance.getManagedElement(c.sourceId);
+            source = sourceEl;
           }
 
-          let target
-          try {//?
-            target = this.boardService.instance.getGroup(c.targetId).el;
+          let target;
+          try {
+            target = this.boardService.instance.getGroup(c.targetId)?.el;
           } catch (error) {
-            target = this.boardService.instance.getManagedElement(c.targetId);
+            target = targetEl;
           }
 
-          const anchor = c.anchor;
-          const connector = c.connector;
-          const paintStyle = c.paintStyle;
-          const hoverPaintStyle = c.hoverPaintStyle
-          const endpointStyle = c.endpointStyle
-          let overlays:OverlaySpec[]=[];
-          c.overlays.forEach((overlay)=>{
-            	let overlayConfig:OverlaySpec;
-              if(overlay.label.inputValue != '') {
-                overlayConfig = {
-                  type: 'Custom',
-                  options: {
-                    create: ()=>{
-                      const label: HTMLInputElement = renderer.createElement('input');
-                      label.value = overlay.label.inputValue;
-                      renderer.setAttribute(label, 'class', 'labelConnection');
-                      renderer.setAttribute(label,'type','text');
-                      return label;
-                    },
-                    location: 0.5,
-                  }
+          if (source && target) {
+            this.boardService.instance.connect({
+              source,
+              target,
+              anchor: c.anchor,
+              connector: c.connector,
+              paintStyle: c.paintStyle,
+              hoverPaintStyle: c.hoverPaintStyle,
+              endpointStyle: c.endpointStyle,
+              overlays: c.overlays.map(overlay => ({
+                type: 'Custom',
+                options: {
+                  create: () => {
+                    const label: HTMLInputElement = renderer.createElement('input');
+                    label.value = overlay.label.inputValue;
+                    renderer.setAttribute(label, 'class', 'labelConnection');
+                    renderer.setAttribute(label, 'type', 'text');
+                    return label;
+                  },
+                  location: 0.5,
                 }
-                overlays.push(overlayConfig);
-              }
-          })
-
-          this.boardService.instance.connect({
-            anchor,
-            connector,
-            source,
-            target,
-            paintStyle,
-            hoverPaintStyle,
-            endpointStyle,
-            overlays,
-          })
-        })
+              }))
+            });
+          }
+        });
+        this.boardService.instance.repaintEverything();
       }
 
+      // Restore groups after nodes
       if(activeBoard.groups) {
+        activeBoard.groups.forEach(e => {
+          const group = this.boardService.instance.getGroup(e.groupId ?? '');
+          if (group) {
+            const children = e.children.map((child) => {
+              return this.boardService.instance.getManagedElement(child.id ?? '');
+            }).filter(Boolean);
 
-        activeBoard.groups.forEach(e=>{
-          const group = this.boardService.instance.getGroup(e.groupId??'');
-          const children = e.children.map((child)=>{
-            return this.boardService.instance.getManagedElement(child.id??'')
-          })
-
-          children.forEach((c:HTMLElement)=>{
-            if(group.el instanceof HTMLElement) {
-              const top = Number(c.style.top.replace(/[a-z]/g,'')) + Number(group.el.style.top.replace(/[a-z]/g,''));
-              const left = Number(c.style.left.replace(/[a-z]/g,'')) + Number(group.el.style.left.replace(/[a-z]/g,''));
-              renderer.setStyle(c, 'top',`${top}px`)
-              renderer.setStyle(c, 'left',`${left}px`)
-            }
-            this.boardService.instance.addToGroup(group,c);
-          })
-        })
-
+            children.forEach((c: HTMLElement) => {
+              if(group.el instanceof HTMLElement) {
+                const top = Number(c.style.top.replace(/[a-z]/g, '')) + Number(group.el.style.top.replace(/[a-z]/g, ''));
+                const left = Number(c.style.left.replace(/[a-z]/g, '')) + Number(group.el.style.left.replace(/[a-z]/g, ''));
+                renderer.setStyle(c, 'top', `${top}px`);
+                renderer.setStyle(c, 'left', `${left}px`);
+              }
+              this.boardService.instance.addToGroup(group, c);
+            });
+          }
+        });
       }
     }
   }
 
-  createBoard(board?: Board, clearNotes?: boolean) {
+  createBoard(board?: Board, clearNotes?: boolean, projectId?: string): string {
     const id = uuid();
 
     if(board) {
-      this.boards.push({
+      const newBoard = {
         id,
+        projectId: projectId ?? board.projectId,
         dateCreated: board.dateCreated,
         name: board.name,
         connetions: board.connetions,
@@ -197,31 +237,35 @@ export class BoardDataService implements OnInit{
         zoomScale: 1,
         favorite: board.favorite,
         tag: board.tag,
-      })
+      };
+      
+      this.boards.push(newBoard);
+      db.boards.add(newBoard);
     } else {
-      this.boards.push({
+      const newBoard = {
         id,
+        projectId,
         dateCreated: new Date(),
         name: `Untitled board`,
         connetions: [],
         elements: [],
         groups: [],
         zoomScale: 1,
-      })
-
+      };
+      
+      this.boards.push(newBoard);
+      db.boards.add(newBoard);
     }
 
-    this.router.navigate(['/board'], {
-      queryParams: {
-        id,
-      }
-    }).then(()=>{
+    if(clearNotes && this.boardService && this.boardService.instance) {
       try {
-        if(clearNotes)
-          this.nodeService.clearAll();
-      } catch (error) {}
-    })
+        this.nodeService.clearAll();
+      } catch (error) {
+        console.error('Error clearing notes:', error);
+      }
+    }
 
+    return id;
   }
 
   createBoardFromTemplate(
@@ -274,130 +318,208 @@ export class BoardDataService implements OnInit{
 
   }
 
+  isCookiesAccepted(): boolean {
+    return this.cookiesService.accepted;
+  }
+
+  async checkAndAcceptCookies(): Promise<boolean> {
+    if (!this.cookiesService.accepted) {
+      try {
+        this.cookiesService.accepted = true;
+        // Wait a moment for the cookie to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return true;
+      } catch (error) {
+        console.error('Error accepting cookies:', error);
+        return false;
+      }
+    }
+    return true;
+  }
+
   async saveData() {
-    if(!this.cookiesService.accepted) return
-    const id = this.activatedRoute.snapshot.queryParamMap.get('id')
-    let board = this.boards.find(element=>element.id === id)
-
-    if(board?.elements) board.elements=[]
-    if(board?.groups) board.groups=[]
-    if(board?.connetions) board.connetions=[]
-
-    if(board) {
-      this.saveConnections(board);
-
-      this.saveNodes(board);
-
-      board.zoomScale = this.boardService.panzoom.getScale();
-
-      const boardInDb = await db.boards.get(board.id)
-
-      if(boardInDb) {
-        await db.boards.update(board.id,{
-          name: board.name,
-          connetions: board.connetions,
-          elements: board.elements,
-          groups: board.groups,
-          zoomScale: board.zoomScale
-        })
-      } else {
-        await db.boards.add(board);
+    // Check if cookies are accepted
+    if (!this.cookiesService.accepted) {
+      const cookiesAccepted = await this.checkAndAcceptCookies();
+      if (!cookiesAccepted) {
+        return false;
       }
     }
 
+    try {
+      const id = this.activatedRoute.snapshot.queryParamMap.get('id');
+      const projectId = history.state?.projectId;
+      
+      if (!id) {
+        console.warn('No board ID found for saving');
+        return false;
+      }
+      
+      let board = projectId 
+        ? this.getBoard(id, projectId)
+        : this.getBoard(id);
+        
+      if (!board) {
+        console.warn('No board found with ID:', id);
+        return false;
+      }
 
-    // localStorage.setItem("boards",JSON.stringify(this.boards))
-  }
+      // Create a new board object to prevent reference issues
+      const boardToSave = {
+        ...board,
+        projectId: board.projectId, // Ensure projectId is preserved
+        elements: [],
+        groups: [],
+        connetions: []
+      };
 
-  saveConnections(board: Board){
-    const connections = this.boardService.instance.getConnections({
-      scope: '*',
-    })
-    if(connections instanceof Array) {
-      connections.forEach((connection: Connection)=>{
-        type CustomOverlay2 <T> = Partial<T> & {
-          canvas?: HTMLInputElement
-        };//? For some reason, JsPlumb 'CustomOverlay' base type don't have the reference for 'canvas', which is necessary to get internal information about the overlay
+      // Save current state
+      this.saveConnections(boardToSave);
+      this.saveNodes(boardToSave);
+      boardToSave.zoomScale = this.boardService.panzoom.getScale();
 
-        const paintStyle = connection.paintStyle;
-        const hoverPaintStyle = connection.hoverPaintStyle;
-        const endpointStyle = connection.endpointStyle;
-        const sourceId = connection.sourceId;
-        const targetId = connection.targetId;
-        let overlays:{
-          label:{
-            inputValue:string,
-          }
-        }[]=[];
-
-        for (const key in connection.overlays) {
-          const overlay:CustomOverlay2<Overlay> = connection.overlays[key];
-          const inputValue = overlay.canvas?.value ?? '';
-          overlays.push({
-            label:{
-              inputValue,
-            }
-          })
+      // Update or add to database
+      try {
+        const boardInDb = await db.boards.get(boardToSave.id);
+        if (boardInDb) {
+          await db.boards.update(boardToSave.id, {
+            name: boardToSave.name,
+            projectId: boardToSave.projectId,
+            connetions: boardToSave.connetions,
+            elements: boardToSave.elements,
+            groups: boardToSave.groups,
+            zoomScale: boardToSave.zoomScale,
+            dateCreated: boardToSave.dateCreated
+          });
+        } else {
+          await db.boards.add(boardToSave);
         }
 
-        board.connetions.push({
-          anchor: "Continuous",
-          connector: "Bezier",
-          sourceId,
-          targetId,
-          paintStyle,
-          hoverPaintStyle,
-          endpointStyle,
-          overlays
-        })
-      })
+        // Update local state
+        const index = this.boards.findIndex(b => b.id === boardToSave.id);
+        if (index !== -1) {
+          this.boards[index] = boardToSave;
+        }
+
+        console.log('Board saved successfully:', boardToSave.id);
+        return true;
+      } catch (dbError) {
+        console.error('Database error while saving board:', dbError);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving board data:', error);
+      return false;
     }
   }
 
-  saveNodes(board: Board){
-    const elements = this.boardService.instance.getManagedElements()
-    for (const key in elements) {
-      const element = elements[key].el
-      if(element instanceof HTMLElement) {
-        try {
-          const groupElement = elements[key].el._jsPlumbGroup;
-          const groupId = groupElement.elId;
-          const children: {id:string| null}[] = [];
+  saveConnections(board: Board) {
+    try {
+      const connections = this.boardService.instance.getConnections({
+        scope: '*',
+      });
 
-          groupElement.children.forEach((subElement: UINode<Element>)=>{
-            const childId = subElement.el.getAttribute('data-jtk-managed')
-            children.push({
-              id: childId,
-            })
-          })
+      if (connections instanceof Array) {
+        connections.forEach((connection: Connection) => {
+          type CustomOverlay2<T> = Partial<T> & {
+            canvas?: HTMLInputElement
+          };
 
-          board.groups.push({
-            groupId,
-            children
-          })
+          const paintStyle = connection.paintStyle;
+          const hoverPaintStyle = connection.hoverPaintStyle;
+          const endpointStyle = connection.endpointStyle;
+          const sourceId = connection.sourceId;
+          const targetId = connection.targetId;
+          let overlays: {
+            label: {
+              inputValue: string,
+            }
+          }[] = [];
 
-        } catch (error) {}
+          for (const key in connection.overlays) {
+            const overlay: CustomOverlay2<Overlay> = connection.overlays[key];
+            const inputValue = overlay.canvas?.value ?? '';
+            overlays.push({
+              label: {
+                inputValue,
+              }
+            });
+          }
 
-        const x = Number(element.style.left.replace(/[a-z]/g,''));
-        const y = Number(element.style.top.replace(/[a-z]/g,''));
-        const width = Number(element.style.width.replace(/[a-z]/g,''));
-        const height = Number(element.style.height.replace(/[a-z]/g,''));
-        const color = element.style.backgroundColor;
-        const innerText = element.querySelector('textarea')?.value ?? null;
-        const type = element.classList.contains('nodeGroup') ? 'group' : 'node'
-        const id = this.boardService.instance.getId(element);
-
-        board.elements.push({
-          x,
-          y,
-          width,
-          height,
-          innerText,
-          color,
-          type,
-          id
-        })
+          board.connetions.push({
+            anchor: "Continuous",
+            connector: "Bezier",
+            sourceId,
+            targetId,
+            paintStyle,
+            hoverPaintStyle,
+            endpointStyle,
+            overlays
+          });
+        });
       }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  saveNodes(board: Board) {
+    try {
+      const elements = this.boardService.instance.getManagedElements();
+      for (const key in elements) {
+        const element = elements[key].el;
+        if (element instanceof HTMLElement) {
+          try {
+            const groupElement = elements[key].el._jsPlumbGroup;
+            const groupId = groupElement.elId;
+            const children: { id: string | null }[] = [];
+
+            groupElement.children.forEach((subElement: UINode<Element>) => {
+              const childId = subElement.el.getAttribute('data-jtk-managed');
+              children.push({
+                id: childId,
+              });
+            });
+
+            board.groups.push({
+              groupId,
+              children
+            });
+          } catch (error) {
+            // Ignore group errors as not all elements are groups
+          }
+
+          const x = Number(element.style.left.replace(/[a-z]/g, ''));
+          const y = Number(element.style.top.replace(/[a-z]/g, ''));
+          const width = Number(element.style.width.replace(/[a-z]/g, ''));
+          const height = Number(element.style.height.replace(/[a-z]/g, ''));
+          const color = element.style.backgroundColor;
+          const innerText = element.querySelector('textarea')?.value ?? null;
+          const type = element.classList.contains('nodeGroup') ? 'group' : 'node';
+          const id = this.boardService.instance.getId(element);
+
+          // Check for image node
+          let imageSrc: string | null = null;
+          if (element.classList.contains('imageNode')) {
+            const img = element.querySelector('img');
+            imageSrc = img ? img.getAttribute('src') : null;
+          }
+
+          board.elements.push({
+            x,
+            y,
+            width,
+            height,
+            innerText,
+            color,
+            type,
+            id,
+            imageSrc
+          });
+        }
+      }
+    } catch (error) {
+      throw error;
     }
   }
 

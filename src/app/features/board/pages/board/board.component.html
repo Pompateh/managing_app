@@ -20,7 +20,11 @@
     </div>
 </main>
 
-
+<app-image-upload-modal
+  *ngIf="showImageModal"
+  (imageSelected)="onImageSelected($event)"
+  (closeModal)="closeImageModal()">
+</app-image-upload-modal>
 
   <div id="mobile-msg">
     <h1 class="sub-title-2xl">Oh no!</h1>

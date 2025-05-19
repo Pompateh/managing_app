@@ -14,6 +14,7 @@ export class NodeService {
   activeResizeElement: HTMLElement | undefined;
   activeNode: Element | undefined;
   _activeConnection: Connection | undefined;
+  container: HTMLElement | undefined;
 
   public get activeConnection() : Connection | undefined {
     return this._activeConnection
@@ -151,6 +152,22 @@ export class NodeService {
     }
 
     this.boardService.instance.manage(node)
+
+    // Configure endpoints
+    this.boardService.instance.addEndpoint(node, {
+      anchor: 'Continuous',
+      source: true,
+      target: true,
+      maxConnections: -1,
+      endpoint: 'Dot',
+      paintStyle: { 
+        fill: 'transparent',
+        stroke: 'transparent',
+        strokeWidth: 0
+      },
+      connector: 'Bezier'
+    });
+
     return node
   }
 
@@ -173,15 +190,13 @@ export class NodeService {
       hostElement: node
     })
 
-    let top = (y/this.boardService.zoomScale)-this.boardService.translation.y
-    let left = (x/this.boardService.zoomScale)-this.boardService.translation.x
-
+    // Set position and size directly from saved values (no scaling)
     renderer.addClass(node,'nodeContainer')
     renderer.addClass(node,'node')
     if(type == 'group') renderer.addClass(node,'nodeGroup')
     renderer.setStyle(node,'position','absolute')
-    renderer.setStyle(node,'top',`${top}px`)
-    renderer.setStyle(node,'left',`${left}px`)
+    renderer.setStyle(node,'top',`${y}px`)
+    renderer.setStyle(node,'left',`${x}px`)
     if(width) renderer.setStyle(node,'width',`${width}px`);
     if(height) renderer.setStyle(node,'height',`${height}px`);
     if(color) renderer.setStyle(node,'backgroundColor',`${color}`);
@@ -194,7 +209,7 @@ export class NodeService {
     this.boardService.enablePanzoom()
 
     const id = nodeId ?? undefined
-    if(type == 'group') {//? Check if node type is group node
+    if(type == 'group') {
       this.boardService.instance.addGroup({
         id,
         el: node,
@@ -204,6 +219,22 @@ export class NodeService {
     }
 
     this.boardService.instance.manage(node,id)
+
+    // Configure endpoints
+    this.boardService.instance.addEndpoint(node, {
+      anchor: 'Continuous',
+      source: true,
+      target: true,
+      maxConnections: -1,
+      endpoint: 'Dot',
+      paintStyle: { 
+        fill: 'transparent',
+        stroke: 'transparent',
+        strokeWidth: 0
+      },
+      connector: 'Bezier'
+    });
+
     return node
   }
 
@@ -308,5 +339,72 @@ export class NodeService {
 
         this.activeNode = undefined;
     }
+  }
+
+  createNodeWithImage(x: number, y: number, imageUrl: string, renderer: Renderer2, insideGroup: boolean, width?: number, height?: number, nodeId?: string) {
+    const nodeComponentRef = createComponent(NodeComponent, {
+      environmentInjector: this.injector
+    });
+    nodeComponentRef.instance.imageSrc = imageUrl;
+
+    const node = nodeComponentRef.location.nativeElement;
+    node.classList.add('nodeContainer', 'node', 'imageNode');
+    
+    // Set position and size directly from saved values (no scaling)
+    renderer.setStyle(node, 'position', 'absolute');
+    renderer.setStyle(node, 'left', `${x}px`);
+    renderer.setStyle(node, 'top', `${y}px`);
+    renderer.setStyle(node, 'min-width', '0');
+    renderer.setStyle(node, 'max-width', 'none');
+    renderer.setStyle(node, 'min-height', '0');
+    renderer.setStyle(node, 'max-height', 'none');
+
+    // Load image and set dimensions
+    const img = new window.Image();
+    img.onload = () => {
+      const finalWidth = width || img.width;
+      const finalHeight = height || img.height;
+      renderer.setStyle(node, 'width', `${finalWidth}px`);
+      renderer.setStyle(node, 'height', `${finalHeight}px`);
+      node.setAttribute('data-original-width', finalWidth.toString());
+      node.setAttribute('data-original-height', finalHeight.toString());
+    };
+    img.src = imageUrl;
+
+    this.applicationRef.attachView(nodeComponentRef.hostView);
+
+    const container = renderer.selectRootElement('#main', true);
+    renderer.appendChild(container, node);
+    this.boardService.enablePanzoom();
+    this.setActiveNote(node, renderer);
+    this.clearActiveConnection();
+    // Use nodeId if provided, otherwise let jsPlumb assign one
+    this.boardService.instance.manage(node, nodeId);
+
+    // Configure endpoints
+    this.boardService.instance.addEndpoint(node, {
+      anchor: 'Continuous',
+      source: true,
+      target: true,
+      maxConnections: -1,
+      endpoint: 'Dot',
+      paintStyle: { 
+        fill: 'transparent',
+        stroke: 'transparent',
+        strokeWidth: 0
+      },
+      connector: 'Bezier'
+    });
+
+    return node;
+  }
+
+  isImageNode(): boolean {
+    if (!this.activeNode) return false;
+    return this.activeNode.classList.contains('imageNode');
+  }
+
+  setContainer(container: HTMLElement) {
+    this.container = container;
   }
 }

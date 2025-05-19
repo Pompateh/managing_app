@@ -1,8 +1,8 @@
 <nav [style.position]="fixed?'fixed':'relative'" style="z-index: 10;">
   <div id="desktop-port">
     <div class="flex flex-row items-center">
-      <a [routerLink]="['/']">
-        <img src="../../assets/logo.svg" alt="icon" id="logo">
+      <a [routerLink]="isAuthenticated ? ['/projects'] : ['/']">
+        <img src="assets/logo-01.png" alt="Newstalgia" id="logo">
       </a>
       <button class="flex flex-row justify-center items-center ms-[5vw] navbarButton" [matMenuTriggerFor]="menu">
         <p class="font-semibold">Resources</p>
@@ -22,26 +22,23 @@
 
           <div class="!flex flex-col">
             <p class="menuItem">Stay in tune:</p>
-            <a href="https://github.com/hibounoteapp/hibounote" target="_blank" class="!flex !flex-row menuButton">
+            <a href="https://github.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
               <mat-icon svgIcon="github" class="icon-background-400" style="scale: 0.8;"></mat-icon>
               <p class="font-normal ms-2">Github</p>
             </a>
-            <a href="https://x.com/hibounote" target="_blank" class="!flex !flex-row menuButton">
+            <a href="https://twitter.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
               <mat-icon svgIcon="twitter" class="icon-background-400" style="scale: 0.8;"></mat-icon>
               <p class="font-normal ms-2">Twitter</p>
             </a>
-            <a href="https://www.instagram.com/hibounote/" target="_blank" class="!flex !flex-row menuButton">
+            <a href="https://www.instagram.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
               <mat-icon svgIcon="instagram" class="icon-background-400" style="scale: 0.8;"></mat-icon>
               <p class="font-normal ms-2">Instagram</p>
             </a>
           </div>
         </div>
       </mat-menu>
-
-
     </div>
     <div class="flex flex-row items-center">
-
       <ng-container *ngFor="let item of buttons">
           <app-simple-button
           (click)="item.click"
@@ -54,9 +51,6 @@
           [theme]="item.theme">
         </app-simple-button>
       </ng-container>
-
-
-
     </div>
   </div>
 
@@ -69,22 +63,21 @@
           </button>
         </div>
         <div class="flex flex-col items-center mt-2">
-
-          <a class="menuButton border-[1px] border-primary-base-600 text-primary-base-600" [routerLink]="['/account']">Get Started</a>
+          <a class="menuButton border-[1px] border-primary-base-600 text-primary-base-600" [routerLink]="['/projects']">Get Started</a>
           <a class="menuButton underline" [routerLink]="['/about']">About us</a>
           <a class="menuButton underline" [routerLink]="['/blog']">Blog</a>
           <a class="menuButton underline" [routerLink]="['/docs']">Docs</a>
 
           <p class="menuItem mt-10">Stay in tune:</p>
-          <a href="https://github.com/hibounoteapp/hibounote" target="_blank" class="!flex !flex-row menuButton">
+          <a href="https://github.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
             <mat-icon svgIcon="github" class="icon-background-400" style="scale: 0.8;"></mat-icon>
             <p class="font-normal ms-2">Github</p>
           </a>
-          <a href="https://x.com/hibounote" target="_blank" class="!flex !flex-row menuButton">
+          <a href="https://twitter.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
             <mat-icon svgIcon="twitter" class="icon-background-400" style="scale: 0.8;"></mat-icon>
             <p class="font-normal ms-2">Twitter</p>
           </a>
-          <a href="https://www.instagram.com/hibounote/" target="_blank" class="!flex !flex-row menuButton">
+          <a href="https://www.instagram.com/newstalgia" target="_blank" class="!flex !flex-row menuButton">
             <mat-icon svgIcon="instagram" class="icon-background-400" style="scale: 0.8;"></mat-icon>
             <p class="font-normal ms-2">Instagram</p>
           </a>
@@ -92,8 +85,8 @@
       </mat-drawer>
 
       <div class="w-full h-full flex flex-row justify-between items-center">
-        <a [routerLink]="['/']">
-          <img src="../../assets/logo.svg" alt="icon" id="logo">
+        <a [routerLink]="isAuthenticated ? ['/projects'] : ['/']">
+          <img src="assets/logo-01.png" alt="Newstalgia" id="logo">
         </a>
         <button class="flex items-center justify-center py-2" (click)="drawer.toggle()">
           <mat-icon svgIcon="menu" style="height: 30px; width: 30px;"></mat-icon>

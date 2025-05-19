@@ -1,6 +1,6 @@
 <div #toolbox id="toolbox">
 
-  <div #editingNode class="flex flex-col justify-between" *ngIf="nodeService.activeNode; else editingConnection">
+  <div #editingNode class="flex flex-col justify-between" *ngIf="nodeService.activeNode && !nodeService.isImageNode(); else editingConnection">
     <button class="return controlTools" (click)="deactivateNode()">
       <mat-icon svgIcon="return"></mat-icon>
     </button>
@@ -43,6 +43,10 @@
     <div class="grab flex flex-col p-2" draggable="true" id="group" matTooltip="Drag to add" matTooltipPosition="right">
       <mat-icon svgIcon="folder"></mat-icon>
       <span class=" text-[0.75rem] ">Group</span>
+    </div>
+    <div class="grab flex flex-col p-2" draggable="true" id="image" matTooltip="Drag to add image" matTooltipPosition="right">
+      <mat-icon svgIcon="image"></mat-icon>
+      <span class="text-[0.75rem]">Image</span>
     </div>
   </ng-template>
 </div>

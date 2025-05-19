@@ -6,5 +6,6 @@ export interface SavedNode {
 	color: string
 	innerText: string|null,
 	type: string,
-	id: string
+	id: string,
+	imageSrc?: string | null
 }

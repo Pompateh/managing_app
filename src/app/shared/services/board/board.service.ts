@@ -69,6 +69,8 @@ export class BoardService {
     this.zoomScale = scale
     this.instance.setZoom(scale)
     this.translation = this.panzoom.getPan()
+    // Force repaint after zoom
+    this.instance.repaintEverything()
   }
 
   zoom = (event: WheelEvent) => {
@@ -77,12 +79,12 @@ export class BoardService {
 
     this.panzoom.zoomWithWheel(event)
 
-    //* Make a function in this section since it's also used to set initial config
     const scale = this.panzoom.getScale()
     this.zoomScale = scale
     this.instance.setZoom(scale)
     this.translation = this.panzoom.getPan()
-    //*
+    // Force repaint after zoom
+    this.instance.repaintEverything()
   }
 
   resetZoom = () => {
@@ -226,7 +228,7 @@ export class BoardService {
     nodeService.clearActiveConnection();
   }
 
-  bindJsPlumbEvents = (nodeService: NodeService, renderer:Renderer2) => {
+  bindJsPlumbEvents = (nodeService: NodeService, renderer:Renderer2, boardData: BoardDataService) => {
 
     this.instance.bind(jsplumb.EVENT_ENDPOINT_CLICK, (endpoint: jsplumb.Endpoint) => {
       const connection = endpoint.connections[0]
@@ -294,6 +296,15 @@ export class BoardService {
       })
 
     })
+
+    // Bind connection events to save connections
+    this.instance.bind('connection', (info) => {
+      console.log('[jsPlumb] Connection event:', info);
+      boardData.saveData();
+    });
+    this.instance.bind('connectionDetached', () => {
+      boardData.saveData();
+    });
   }
 
   connectorsConfiguration = () => {
@@ -345,19 +356,21 @@ export class BoardService {
     this.panzoom = Panzoom(abstractElement.nativeElement, {
       canvas: true,
       cursor: '',
-      minScale: 0.4,
-      maxScale: 1.5,
+      minScale: 0.4,  // Default minimum zoom out
+      maxScale: 1.5,  // Default maximum zoom in
+      step: 0.1,      // Default zoom step
+      smoothZoom: true
     })
     this.translation = this.panzoom.getPan()
 
     const jsInstance = jsplumb.newInstance({
       container: abstractElement.nativeElement,
       elementsDraggable: true,
-      allowNestedGroups: false,
+      allowNestedGroups: false
     });
     this.instance = jsInstance;
 
     this.connectorsConfiguration()
-    this.bindJsPlumbEvents(nodeService, renderer)
+    this.bindJsPlumbEvents(nodeService, renderer, boardData)
   }
 }

@@ -48,6 +48,14 @@ export class ToolboxComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    const imageElement = this.toolboxContainer.nativeElement.querySelector('#image');
+    if (imageElement) {
+      imageElement.addEventListener('dragstart', (event: DragEvent) => {
+        if (event.dataTransfer) {
+          event.dataTransfer.setData('text', 'image');
+        }
+      });
+    }
 
     this.renderer.listen(this.toolboxContainer.nativeElement,
       'pointerdown',
@@ -56,5 +64,20 @@ export class ToolboxComponent implements AfterViewInit {
 
       this.boardService.disablePanzoom()
     });
+  }
+
+  onImageUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      const imageUrl = e.target.result;
+      // Place the image node at a default position (center of board or fixed offset)
+      this.nodeService.createNodeWithImage(300, 100, imageUrl, this.renderer, false);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so the same file can be uploaded again if needed
+    input.value = '';
   }
 }

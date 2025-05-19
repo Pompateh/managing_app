@@ -314,3 +314,15 @@ html, body { height: 100%; }
   }
 }
 
+.imageNode.activeNode {
+  background: transparent !important;
+  box-shadow: 0 0 0 2px #000;
+}
+
+/* Force all jsPlumb endpoints to be invisible */
+.jtk-endpoint, .jtk-endpoint svg, .jtk-endpoint circle {
+  fill: transparent !important;
+  stroke: transparent !important;
+  background: transparent !important;
+}
+

@@ -1,5 +1,40 @@
 main {
-  @apply min-h-screen w-full flex justify-center items-center flex-col bg-background-base-50 pb-10;
+  @apply select-none min-h-screen bg-background-300;
+  background-image:
+    radial-gradient(rgb(5, 1, 21) 13.6%, transparent 13.6%);
+  background-position: 8px 8px;
+  background-size: 16px 16px;
+  background-color: rgb(250, 248, 241);
+}
+
+.login-container {
+  @apply container mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-screen;
+}
+
+.login-card {
+  @apply bg-white/80 backdrop-blur-sm rounded-lg shadow-lg p-8 w-full max-w-md;
+}
+
+.title {
+  @apply text-3xl font-bold text-center mb-8 text-gray-800;
+}
+
+:host ::ng-deep {
+  app-simple-form {
+    @apply w-full max-w-md mx-auto;
+
+    .form-field {
+      @apply mb-6;
+    }
+
+    input {
+      @apply w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500;
+    }
+
+    button {
+      @apply w-full mb-4 last:mb-0;
+    }
+  }
 }
 
 #bgBlobSingle {

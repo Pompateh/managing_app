@@ -91,7 +91,7 @@ export class ContentService {
 
       ## Basic functions
 
-      To access the basic functionalty and board usage, access the [tutorials page](/tutorial).
+      To learn about basic functionality and board usage, please refer to our documentation at https://hibounote.netlify.app
 
       <br>
 

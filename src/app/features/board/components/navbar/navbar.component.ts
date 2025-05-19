@@ -48,9 +48,52 @@ export class NavbarComponent {
 
   }
 
-  saveData() {
-    this.boardData.saveData();
-    this.router.navigate(['/account'])
+  goBack() {
+    // Get the project ID from the route params
+    const projectId = this.activatedRoute.snapshot.params['projectId'];
+    if (projectId) {
+      this.router.navigate(['/projects', projectId]);
+    } else {
+      this.router.navigate(['/projects']);
+    }
+  }
+
+  async saveData() {
+    try {
+      // Check if cookies are accepted
+      if (!this.boardData.isCookiesAccepted()) {
+        this.openSnackBar('Please accept cookies to save your board data', 'Info');
+        const cookiesAccepted = await this.boardData.checkAndAcceptCookies();
+        if (!cookiesAccepted) {
+          this.openSnackBar('Failed to accept cookies. Please try again.', 'Error');
+          return;
+        }
+      }
+
+      // Show saving indicator
+      this.openSnackBar('Saving board...', 'Info');
+
+      // Save board data first
+      const saveResult = await this.boardData.saveData();
+      if (!saveResult) {
+        this.openSnackBar('Failed to save board data. Please try again.', 'Error');
+        return;
+      }
+
+      // Show success message
+      this.openSnackBar('Board saved successfully', 'Success');
+
+      // Get the project ID from the route params
+      const projectId = this.activatedRoute.snapshot.params['projectId'];
+      if (projectId) {
+        this.router.navigate(['/projects', projectId]);
+      } else {
+        this.router.navigate(['/projects']);
+      }
+    } catch (error) {
+      console.error('Error saving board:', error);
+      this.openSnackBar('Error saving board. Please try again.', 'Error');
+    }
   }
 
   confirmDelete() {
@@ -93,7 +136,10 @@ export class NavbarComponent {
 
   openSnackBar(message: string, action: string) {
     this.snackBar.open(message, action, {
-      duration: 5000
+      duration: 3000,
+      horizontalPosition: 'center',
+      verticalPosition: 'bottom',
+      panelClass: ['custom-snackbar']
     });
   }
 
