@@ -1,9 +1,9 @@
 # Shape the Future of Infinite Thinking!
 
-Hibounote is an open-source project. I really apreciate any effort on it. Below are the guidelines to get started.
+Newstalgia is an open-source project. I really apreciate any effort on it. Below are the guidelines to get started.
 
 ## Technology Stack
-Hibounote is built using Angular. The back-end (not builded yet) that will record the user login and board data will be probably builded in Node.js with MongoDB.
+Newstalgia is built using Angular. The back-end (not builded yet) that will record the user login and board data will be probably builded in Node.js with MongoDB.
 
 Libraries we use
  - SASS;
@@ -13,7 +13,7 @@ Libraries we use
  - [Panzoom](https://github.com/timmywil/panzoom);
 
 ### Dependencies
-To be able to start development on Hibounote, make sure you have the following prerequisites installed:
+To be able to start development on Newstalgia, make sure you have the following prerequisites installed:
 - Node (v18.20 or higher)
 - NPM (v10 or higher)
 - Angular (v18)
@@ -22,8 +22,8 @@ To be able to start development on Hibounote, make sure you have the following p
 
 1. Clone the repository and install dependencies:
 ```
-git clone https://github.com/gustavofdasilva/hibounote.git
-cd hibounote
+git clone https://github.com/gustavofdasilva/newstalgia.git
+cd newstalgia
 npm install
 ```
 <br>

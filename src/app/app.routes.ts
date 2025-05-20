@@ -5,10 +5,7 @@ import { LoginComponent } from './features/login/pages/login/login.component';
 import { SignUpComponent } from './features/sign-up/pages/sign-up/sign-up.component';
 import { ResetPasswordComponent } from './features/reset-password/pages/reset-password/reset-password.component';
 import { AboutComponent } from './features/about/pages/about/about.component';
-import { TermsComponent } from './features/terms/pages/terms/terms.component';
 import { SupportComponent } from './features/support/pages/support/support.component';
-import { BlogComponent } from './features/blog/pages/blog/blog.component';
-import { PostComponent } from './features/blog/pages/post/post.component';
 import { NotFoundComponent } from './features/notfound/not-found/not-found.component';
 import { AdminLandingComponent } from './features/admin-landing/pages/admin-landing/admin-landing.component';
 import { authGuard } from './core/guards/auth.guard';
@@ -71,23 +68,8 @@ export const routes: Routes = [
     data: { roles: ['admin', 'user'] }
   },
   {
-    path: 'terms',
-    component: TermsComponent,
-    data: { requireAuth: false }
-  },
-  {
     path: 'support',
     component: SupportComponent,
-    data: { requireAuth: false }
-  },
-  {
-    path: 'blog',
-    component: BlogComponent,
-    data: { requireAuth: false }
-  },
-  {
-    path: 'blog/post',
-    component: PostComponent,
     data: { requireAuth: false }
   },
   {

@@ -59,7 +59,7 @@ const sprintRetro2: TemplateBoard = {
       y: 57,
       width: 307,
       height: 28,
-      innerText: "Use Hibounote!",
+      innerText: "Use Newstalgia!",
       color: "",
       type: "node",
       id: "9d04cf6b-92ff-4196-84ac-78df74c111f3"
