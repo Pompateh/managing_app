@@ -20,7 +20,15 @@
   </div>
 </ng-container>
 <ng-template #textNode>
-  <textarea class="desc nodeElement" readonly disabled="true" [value]="innerTextarea" placeholder="Double click to type..."></textarea>
+  <textarea class="desc nodeElement"
+    [readonly]="isViewer ? currentUserEmail !== createdByUserId : false"
+    [disabled]="isViewer ? currentUserEmail !== createdByUserId : false"
+    [class.no-interact]="isLockedForViewer"
+    [attr.tabindex]="isLockedForViewer ? -1 : 0"
+    (focus)="onTextareaFocus($event)"
+    [value]="innerTextarea"
+    placeholder="Double click to type...">
+  </textarea>
 </ng-template>
 
 

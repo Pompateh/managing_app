@@ -50,5 +50,9 @@
         <span class="text-[0.75rem]">Image</span>
       </div>
     </ng-container>
+    <!-- Done button for viewers only -->
+    <div *ngIf="isViewer && !isAccepted" class="done-btn-container">
+      <button (click)="onDoneClick()" class="done-btn">Done</button>
+    </div>
   </ng-template>
 </div>

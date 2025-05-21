@@ -98,7 +98,7 @@ export class NodeService {
     renderer.setStyle(abstractElement,'height',`${calcSize.height}px`)
   }
 
-  createNode(x: number, y: number, type: string, renderer: Renderer2, insideGroup: boolean) {
+  createNode(x: number, y: number, type: string, renderer: Renderer2, insideGroup: boolean, createdByUserId?: string, createdByRole?: string) {
     let node;
     let nodeComponent;
     switch (type) {
@@ -133,6 +133,23 @@ export class NodeService {
     renderer.setStyle(node, 'width','200px')
     renderer.setStyle(node, 'height','100px')
 
+    // Store creator info
+    if (createdByUserId) {
+      node.dataset['createdByUserId'] = createdByUserId;
+      console.log('[DEBUG] Creating node with creator:', createdByUserId);
+    }
+    if (createdByRole) node.dataset['createdByRole'] = createdByRole;
+
+    // Pass creator info to NodeComponent
+    if (nodeComponentRef.instance.constructor.name === 'NodeComponent') {
+      (nodeComponentRef.instance as any).createdByUserId = createdByUserId || '';
+      // Always pass currentUserEmail
+      (nodeComponentRef.instance as any).currentUserEmail = this.boardService.currentUserEmail;
+      // Pass isViewer
+      (nodeComponentRef.instance as any).isViewer = this.boardService.isViewer;
+      console.log('[DEBUG] Creating node with currentUserEmail:', this.boardService.currentUserEmail);
+    }
+
     this.applicationRef.attachView(nodeComponentRef.hostView)
 
     this.clearActiveNote(renderer)
@@ -142,6 +159,11 @@ export class NodeService {
     const container = renderer.selectRootElement('#main',true)
     renderer.appendChild(container, node)
     this.boardService.enablePanzoom()
+
+    // Prevent selection/interactivity for nodes not created by viewers
+    if (this.boardService.isViewer && createdByRole !== 'VIEWER') {
+      node.classList.add('no-select');
+    }
 
     if(type == 'group') {//? Check if node type is group node
       this.boardService.instance.addGroup({
@@ -179,7 +201,7 @@ export class NodeService {
     return node
   }
 
-  loadNode(x: number, y: number, width: number | null, height: number | null, color: string | null, innerText: string | null, type: string, renderer: Renderer2, nodeId: string | null) {
+  loadNode(x: number, y: number, width: number | null, height: number | null, color: string | null, innerText: string | null, type: string, renderer: Renderer2, nodeId: string | null, createdByUserId?: string, createdByRole?: string) {
     let node;
     let nodeComponent;
     switch (type) {
@@ -210,11 +232,37 @@ export class NodeService {
     if(color) renderer.setStyle(node,'backgroundColor',`${color}`);
     if(innerText) nodeComponentRef.instance.innerTextarea = innerText
 
+    // Restore creator info
+    if (createdByUserId) {
+      node.dataset['createdByUserId'] = createdByUserId;
+      console.log('[DEBUG] Loading node with creator:', createdByUserId);
+    }
+    if (createdByRole) node.dataset['createdByRole'] = createdByRole;
+
+    // Pass creator info to NodeComponent
+    if (nodeComponentRef.instance.constructor.name === 'NodeComponent') {
+      (nodeComponentRef.instance as any).createdByUserId = createdByUserId || '';
+      // Always pass currentUserEmail
+      (nodeComponentRef.instance as any).currentUserEmail = this.boardService.currentUserEmail;
+      // Pass isViewer
+      (nodeComponentRef.instance as any).isViewer = this.boardService.isViewer;
+      console.log('[DEBUG] Loading node with currentUserEmail:', this.boardService.currentUserEmail);
+    }
+
     this.applicationRef.attachView(nodeComponentRef.hostView)
+
+    this.clearActiveNote(renderer)
+    this.clearActiveConnection();
+    this.setActiveNote(node, renderer)
 
     const container = renderer.selectRootElement('#main',true)
     renderer.appendChild(container, node)
     this.boardService.enablePanzoom()
+
+    // Prevent selection/interactivity for nodes not created by viewers
+    if (this.boardService.isViewer && createdByRole !== 'VIEWER') {
+      node.classList.add('no-select');
+    }
 
     const id = nodeId ?? undefined
     if(type == 'group') {
@@ -357,7 +405,7 @@ export class NodeService {
     }
   }
 
-  createNodeWithImage(x: number, y: number, imageUrl: string, renderer: Renderer2, insideGroup: boolean, width?: number, height?: number, nodeId?: string) {
+  createNodeWithImage(x: number, y: number, imageUrl: string, renderer: Renderer2, insideGroup: boolean, width?: number, height?: number, nodeId?: string, createdByUserId?: string, createdByRole?: string) {
     const nodeComponentRef = createComponent(NodeComponent, {
       environmentInjector: this.injector
     });
@@ -374,6 +422,10 @@ export class NodeService {
     renderer.setStyle(node, 'max-width', 'none');
     renderer.setStyle(node, 'min-height', '0');
     renderer.setStyle(node, 'max-height', 'none');
+
+    // Restore creator info
+    if (createdByUserId) node.dataset['createdByUserId'] = createdByUserId;
+    if (createdByRole) node.dataset['createdByRole'] = createdByRole;
 
     // Load image and set dimensions
     const img = new window.Image();

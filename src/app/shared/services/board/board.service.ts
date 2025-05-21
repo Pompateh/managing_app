@@ -27,6 +27,8 @@ export class BoardService {
   appRenderer!: Renderer2;
   lockDrag: boolean = false;
   boardData!: BoardDataService;
+  currentUserEmail: string = '';
+  isViewer: boolean = false;
 
   constructor(
     protected activeRoute: ActivatedRoute
@@ -151,9 +153,20 @@ export class BoardService {
 
   pointerDownNode = (event: PointerEvent, element: Element, nodeService: NodeService,renderer: Renderer2) => { //? Handling click event in node
     if(!(event.target instanceof Element)) return
+    // Restrict viewers: only allow dragging their own nodes
+    if (this.isViewer) {
+      const node = element as HTMLElement;
+      console.log('[DEBUG] pointerDownNode check:', {
+        nodeCreator: node.dataset['createdByUserId'],
+        currentUser: this.currentUserEmail,
+        isViewer: this.isViewer
+      });
+      if (node.dataset['createdByUserId'] !== this.currentUserEmail) {
+        console.log('[DEBUG] Drag prevented - not owner');
+        return;
+      }
+    }
     this.disablePanzoom()
-
-
   }
 
   pointerDownConnection = (event: PointerEvent, nodeService: NodeService, renderer: Renderer2) => { //? Handling click event in connectionoar
@@ -260,7 +273,16 @@ export class BoardService {
       const abstractElement:Element = renderer.selectRootElement(element, true)
 
       let desc:Element | null = abstractElement.querySelector('.desc')
-      if(desc && (desc?.getAttribute('readonly') != '' || desc?.getAttribute('disabled') != '')){
+      // Only allow removing readonly/disabled if not a viewer, or if viewer is the owner
+      const nodeCreator = (abstractElement as HTMLElement).dataset['createdByUserId'];
+      const isViewer = this.isViewer;
+      const currentUser = this.currentUserEmail;
+
+      if (
+        desc &&
+        (desc?.getAttribute('readonly') != '' || desc?.getAttribute('disabled') != '') &&
+        (!isViewer || nodeCreator === currentUser)
+      ) {
         try {
           let dragDiv:Element | null = abstractElement.querySelector('.dragDiv')
           if(dragDiv && !dragDiv.classList.contains('hidden')) {
@@ -278,6 +300,17 @@ export class BoardService {
 
     this.instance.bind(jsplumb.INTERCEPT_BEFORE_DROP, (params: jsplumb.BeforeDropParams) => {
       if (this.boardData.activeBoard?.accepted) return false;
+      // Restrict viewers: only allow connecting their own nodes
+      if (this.isViewer) {
+        const sourceNode = this.instance.getManagedElement(params.sourceId) as HTMLElement;
+        const targetNode = this.instance.getManagedElement(params.targetId) as HTMLElement;
+        if (
+          sourceNode.dataset['createdByUserId'] !== this.currentUserEmail ||
+          targetNode.dataset['createdByUserId'] !== this.currentUserEmail
+        ) {
+          return false;
+        }
+      }
       const sourceNode = this.instance.getManagedElement(params.sourceId);
       const targetNode = this.instance.getManagedElement(params.targetId);
 
@@ -326,6 +359,23 @@ export class BoardService {
     });
     this.instance.bind('connectionDetached', () => {
       boardData.saveData();
+    });
+
+    // Add drag start handler for viewer restrictions
+    this.instance.bind(jsplumb.EVENT_DRAG_START, (info: jsplumb.DragStartEventParams) => {
+      if (this.isViewer) {
+        const node = info.el as HTMLElement;
+        console.log('[DEBUG] EVENT_DRAG_START check:', {
+          nodeCreator: node.dataset['createdByUserId'],
+          currentUser: this.currentUserEmail,
+          isViewer: this.isViewer
+        });
+        if (node.dataset['createdByUserId'] !== this.currentUserEmail) {
+          console.log('[DEBUG] Drag prevented - not owner');
+          return false; // Prevent drag if not owner
+        }
+      }
+      return true;
     });
   }
 

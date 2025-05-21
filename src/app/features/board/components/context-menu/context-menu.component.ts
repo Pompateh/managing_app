@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, Input, OnInit, QueryList, Renderer2, ViewChildren } from '@angular/core';
 import { NodeService } from '../../services/node/node.service';
 import { BoardService } from '../../../../shared/services/board/board.service';
+import { AuthService } from '@core-services/auth/auth.service';
 
 @Component({
   selector: 'context-menu-component',
@@ -17,7 +18,8 @@ export class ContextMenuComponent{
   constructor(
     public nodeService: NodeService,
     private boardService: BoardService,
-    private renderer: Renderer2
+    private renderer: Renderer2,
+    private authService: AuthService
   ) {
 
   }
@@ -25,7 +27,10 @@ export class ContextMenuComponent{
   newNode(type: string) {
     const x = this.boardService.contextMenu.x
     const y = this.boardService.contextMenu.y
-    this.nodeService.createNode(x,y,type, this.renderer,false)
+    const user = this.authService.getCurrentUser();
+    const userEmail = user?.email ? user.email : '';
+    const userRole = user?.role ? user.role : '';
+    this.nodeService.createNode(x, y, type, this.renderer, false, userEmail, userRole);
     this.boardService.contextMenu.show=false;
   }
 

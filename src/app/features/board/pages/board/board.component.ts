@@ -73,6 +73,12 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     onKeyDown(event: KeyboardEvent) {
       if(this.isAccepted) return;
       if(event.key === 'Delete' && this.nodeService.activeNode) {
+        // Restrict viewers: only allow deleting their own nodes
+        if (this.isViewer) {
+          const node = this.nodeService.activeNode as HTMLElement;
+          console.log('[DEBUG] Delete check:', node.dataset['createdByUserId'], this.currentUserEmail);
+          if (node.dataset['createdByUserId'] !== this.currentUserEmail) return;
+        }
         const activeNode = this.nodeService.activeNode
         this.nodeService.deleteNode(activeNode,this.renderer,this.nodeService)
       }
@@ -100,6 +106,12 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
   editNode(attribute: string, value: string) {
     if(this.isAccepted) return;
     if(!this.nodeService.activeNode) return;
+    // Restrict viewers: only allow editing their own nodes
+    if (this.isViewer) {
+      const node = this.nodeService.activeNode as HTMLElement;
+      console.log('[DEBUG] Edit check:', node.dataset['createdByUserId'], this.currentUserEmail);
+      if (node.dataset['createdByUserId'] !== this.currentUserEmail) return;
+    }
     this.nodeService.editNode(attribute,this.nodeService.activeNode,this.renderer,value);
   }
 
@@ -224,8 +236,11 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
     const user = this.authService.getCurrentUser();
     this.isViewer = user?.role === 'VIEWER';
-    this.currentUserEmail = user?.email || '';
+    this.currentUserEmail = user?.email ? user.email : '';
     this.isAccepted = !!this.boardData.activeBoard?.accepted;
+    // Pass to BoardService for connection restrictions
+    this.boardService.currentUserEmail = this.currentUserEmail;
+    this.boardService.isViewer = this.isViewer;
   }
 
   async ngAfterViewInit() {
@@ -331,8 +346,26 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
       this.showImageModal = true;
       return;
     }
-    // Fallback to existing dropNode logic
-    this.boardService.dropNode(event, this.nodeService, this.container, this.renderer);
+    // Only for viewers: pass user info to createNode
+    if (this.isViewer) {
+      const rect = this.boardContainer.nativeElement.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      console.log('[DEBUG] Viewer creating node with', this.currentUserEmail, 'VIEWER');
+      const viewerEmail = this.currentUserEmail ? this.currentUserEmail : '';
+      const nodeType = typeof type === 'string' ? type : 'note';
+      this.nodeService.createNode(x, y, nodeType, this.renderer, false, viewerEmail, 'VIEWER');
+      return;
+    }
+    // For non-viewers: pass current user's email and role
+    const rect = this.boardContainer.nativeElement.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const user = this.authService.getCurrentUser();
+    const userEmail = user?.email ? user.email : '';
+    const userRole = user?.role ? user.role : '';
+    const nodeType = typeof type === 'string' ? type : 'note';
+    this.nodeService.createNode(x, y, nodeType, this.renderer, false, userEmail, userRole);
   }
 
   onImageSelected(imageUrl: string) {

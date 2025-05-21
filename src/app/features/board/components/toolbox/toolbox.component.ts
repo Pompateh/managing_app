@@ -18,6 +18,7 @@ export class ToolboxComponent implements AfterViewInit {
   @ViewChild('toolbox',{static: true}) toolboxContainer!: ElementRef;
   @Input() isViewer: boolean = false;
   @Input() isAccepted: boolean = false;
+  @Input() onDoneClick!: () => void;
 
   constructor(
     public nodeService: NodeService,

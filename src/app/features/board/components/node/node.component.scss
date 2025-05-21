@@ -58,3 +58,25 @@
     display: none !important;
   }
 }
+
+.no-interact {
+  pointer-events: none !important;
+  user-select: none !important;
+  opacity: 0.7;
+  background: #f5f5f5;
+}
+.no-interact * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.no-select {
+  pointer-events: none !important;
+  user-select: none !important;
+  opacity: 0.7;
+  background: #f5f5f5;
+}
+.no-select * {
+  pointer-events: none !important;
+  user-select: none !important;
+}

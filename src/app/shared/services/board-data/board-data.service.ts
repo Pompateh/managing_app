@@ -134,17 +134,40 @@ export class BoardDataService implements OnInit{
         const nodePromises = activeBoard.elements.map(async (e: SavedNode) => {
           const x = e.x;
           const y = e.y;
-          const width = e.width;
-          const height = e.height;
+          const width = e.width ?? undefined;
+          const height = e.height ?? undefined;
           const color = e.color;
           const innerText = e.innerText ?? '';
           const type = e.type;
           const nodeId = e.id;
 
           if (e.imageSrc) {
-            return this.nodeService.createNodeWithImage(x, y, e.imageSrc, renderer, false, width, height, nodeId);
+            return this.nodeService.createNodeWithImage(
+              x,
+              y,
+              e.imageSrc,
+              renderer,
+              false,
+              width,
+              height,
+              nodeId,
+              e.createdByUserId,
+              e.createdByRole
+            );
           } else {
-            return this.nodeService.loadNode(x, y, width, height, color, innerText, type, renderer, nodeId);
+            return this.nodeService.loadNode(
+              x,
+              y,
+              width === undefined ? null : width,
+              height === undefined ? null : height,
+              color,
+              innerText,
+              type,
+              renderer,
+              nodeId,
+              e.createdByUserId,
+              e.createdByRole
+            );
           }
         });
         await Promise.all(nodePromises);
@@ -517,7 +540,9 @@ export class BoardDataService implements OnInit{
             color,
             type,
             id,
-            imageSrc
+            imageSrc,
+            createdByUserId: (element.dataset['createdByUserId'] !== undefined && element.dataset['createdByUserId'] !== null) ? element.dataset['createdByUserId'] : undefined,
+            createdByRole: (element.dataset['createdByRole'] !== undefined && element.dataset['createdByRole'] !== null) ? element.dataset['createdByRole'] : undefined
           });
         }
       }
