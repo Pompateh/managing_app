@@ -30,7 +30,7 @@ import { UserService } from '../../../../core/services/user/user.service';
     MatDialogModule
   ],
   template: `
-    <div class="min-h-screen bg-background-300 polka">
+    <div class="min-h-screen bg-background-300">
       <div class="container mx-auto px-4 py-8">
         <div class="max-w-7xl mx-auto">
           <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">Admin Dashboard</h1>
@@ -43,7 +43,6 @@ import { UserService } from '../../../../core/services/user/user.service';
                   <p class="text-gray-600 text-sm font-medium">Total Projects</p>
                   <h3 class="text-2xl font-bold text-gray-800">{{ totalProjects }}</h3>
                 </div>
-                <mat-icon class="text-blue-500 text-3xl">folder</mat-icon>
               </div>
             </div>
             <div class="bg-white rounded-lg p-6 shadow-lg">
@@ -52,7 +51,6 @@ import { UserService } from '../../../../core/services/user/user.service';
                   <p class="text-gray-600 text-sm font-medium">Active Users</p>
                   <h3 class="text-2xl font-bold text-gray-800">{{ activeUsers }}</h3>
                 </div>
-                <mat-icon class="text-green-500 text-3xl">people</mat-icon>
               </div>
             </div>
             <div class="bg-white rounded-lg p-6 shadow-lg">
@@ -63,9 +61,6 @@ import { UserService } from '../../../../core/services/user/user.service';
                     {{ nearDueProjects.length }}
                   </h3>
                 </div>
-                <mat-icon [class]="nearDueProjects.length > 0 ? 'text-red-500' : 'text-green-500'" class="text-3xl">
-                  {{ nearDueProjects.length > 0 ? 'warning' : 'check_circle' }}
-                </mat-icon>
               </div>
             </div>
           </div>
@@ -74,7 +69,6 @@ import { UserService } from '../../../../core/services/user/user.service';
           <div *ngIf="nearDueProjects.length > 0" class="mb-8">
             <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
               <div class="flex items-center">
-                <mat-icon class="text-red-500 mr-3">warning</mat-icon>
                 <div>
                   <h3 class="text-lg font-semibold text-red-700">Projects Near Due Date</h3>
                   <p class="text-red-600">The following projects are approaching their deadline:</p>
@@ -107,14 +101,12 @@ import { UserService } from '../../../../core/services/user/user.service';
                 <button 
                   (click)="openProjectCreationModal()"
                   class="w-full flex items-center justify-between p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                  <span class="text-gray-800 font-medium">Create New Project</span>
-                  <mat-icon class="text-blue-500">add_circle</mat-icon>
+                  <span class="text-gray-800 font-medium truncate min-w-0">Create New Project</span>
                 </button>
                 <button 
                   (click)="openVersionControl()"
                   class="w-full flex items-center justify-between p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                  <span class="text-gray-800 font-medium">Version Control</span>
-                  <mat-icon class="text-blue-500">history</mat-icon>
+                  <span class="text-gray-800 font-medium truncate min-w-0">Version Control</span>
                 </button>
               </div>
             </div>
@@ -126,20 +118,17 @@ import { UserService } from '../../../../core/services/user/user.service';
                 <button 
                   (click)="openInviteCollaborators()"
                   class="w-full flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                  <span class="text-gray-800 font-medium">Invite Collaborators</span>
-                  <mat-icon class="text-green-500">person_add</mat-icon>
+                  <span class="text-gray-800 font-medium truncate min-w-0">Invite Collaborators</span>
                 </button>
                 <button 
                   (click)="openManageRoles()"
                   class="w-full flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                  <span class="text-gray-800 font-medium">Manage Roles</span>
-                  <mat-icon class="text-green-500">admin_panel_settings</mat-icon>
+                  <span class="text-gray-800 font-medium truncate min-w-0">Manage Roles</span>
                 </button>
                 <button 
                   (click)="openUserActivity()"
                   class="w-full flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-                  <span class="text-gray-800 font-medium">User Activity</span>
-                  <mat-icon class="text-green-500">analytics</mat-icon>
+                  <span class="text-gray-800 font-medium truncate min-w-0">User Activity</span>
                 </button>
               </div>
             </div>
@@ -152,13 +141,11 @@ import { UserService } from '../../../../core/services/user/user.service';
               <div *ngFor="let activity of recentActivities" 
                    class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div class="flex items-center">
-                  <mat-icon [class]="'text-' + activity.iconColor + '-500 mr-3'">{{ activity.icon }}</mat-icon>
                   <div>
                     <p class="font-semibold text-gray-800">{{ activity.title }}</p>
                     <p class="text-sm text-gray-600">{{ activity.description }}</p>
                   </div>
                 </div>
-                <mat-icon class="text-gray-400">chevron_right</mat-icon>
               </div>
             </div>
           </div>

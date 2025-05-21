@@ -10,6 +10,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { UserService } from '../../../core/services/user/user.service';
 import { UserRole } from '../../../core/models/user.model';
+import { ProjectService } from '../../../core/services/project/project.service';
 
 @Component({
   selector: 'app-invite-collaborators-modal',
@@ -60,7 +61,7 @@ import { UserRole } from '../../../core/models/user.model';
         <!-- Role -->
         <mat-form-field class="w-full">
           <mat-label>Role</mat-label>
-          <mat-select formControlName="role" required>
+          <mat-select formControlName="role" required (selectionChange)="onRoleChange($event.value)">
             <mat-option [value]="UserRole.MANAGER">Manager</mat-option>
             <mat-option [value]="UserRole.MEMBER">Member</mat-option>
             <mat-option [value]="UserRole.VIEWER">Viewer</mat-option>
@@ -69,6 +70,19 @@ import { UserRole } from '../../../core/models/user.model';
             Role is required
           </mat-error>
         </mat-form-field>
+
+        <!-- Project Dropdown for Viewer -->
+        <ng-container *ngIf="inviteForm.get('role')?.value === UserRole.VIEWER">
+          <mat-form-field class="w-full">
+            <mat-label>Assign Project</mat-label>
+            <mat-select formControlName="projectId" required>
+              <mat-option *ngFor="let project of projects" [value]="project.id">{{ project.name }}</mat-option>
+            </mat-select>
+            <mat-error *ngIf="inviteForm.get('projectId')?.hasError('required')">
+              Project is required for viewers
+            </mat-error>
+          </mat-form-field>
+        </ng-container>
 
         <div class="flex justify-end gap-4 mt-6">
           <button mat-button type="button" (click)="onCancel()">Cancel</button>
@@ -94,25 +108,34 @@ import { UserRole } from '../../../core/models/user.model';
 export class InviteCollaboratorsModalComponent {
   inviteForm: FormGroup;
   UserRole = UserRole;
+  projects: any[] = [];
 
   constructor(
     private dialogRef: MatDialogRef<InviteCollaboratorsModalComponent>,
     private fb: FormBuilder,
     private userService: UserService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private projectService: ProjectService
   ) {
     this.inviteForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
-      role: [UserRole.MEMBER, Validators.required]
+      role: [UserRole.MEMBER, Validators.required],
+      projectId: ['']
+    });
+    this.projectService.getProjects().subscribe(projects => {
+      this.projects = projects;
     });
   }
 
   onSubmit() {
     if (this.inviteForm.valid) {
-      const { email, role } = this.inviteForm.value;
-      
+      const { email, role, projectId } = this.inviteForm.value;
       try {
-        this.userService.inviteUser(email, role);
+        if (role === UserRole.VIEWER) {
+          this.userService.inviteUser(email, role, projectId);
+        } else {
+          this.userService.inviteUser(email, role);
+        }
         this.snackBar.open('Collaborator invited successfully! They can sign in with their email and default password.', 'Close', {
           duration: 5000,
           horizontalPosition: 'end',
@@ -132,5 +155,15 @@ export class InviteCollaboratorsModalComponent {
 
   onCancel() {
     this.dialogRef.close();
+  }
+
+  onRoleChange(role: string) {
+    if (role === UserRole.VIEWER) {
+      this.inviteForm.get('projectId')?.setValidators([Validators.required]);
+    } else {
+      this.inviteForm.get('projectId')?.clearValidators();
+      this.inviteForm.get('projectId')?.setValue('');
+    }
+    this.inviteForm.get('projectId')?.updateValueAndValidity();
   }
 } 

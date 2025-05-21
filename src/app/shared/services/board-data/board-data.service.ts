@@ -116,6 +116,7 @@ export class BoardDataService implements OnInit{
   }
 
   async checkData(renderer: Renderer2) {
+    console.log('[DEBUG] checkData called');
     if(!this.cookiesService.accepted) return;
     const id = this.activatedRoute.snapshot.queryParamMap.get('id') ?? '';
     const activeBoard: Board | undefined = this.getData(id);
@@ -414,6 +415,7 @@ export class BoardDataService implements OnInit{
   }
 
   saveConnections(board: Board) {
+    if (!this.boardService.instance) return;
     try {
       const connections = this.boardService.instance.getConnections({
         scope: '*',
@@ -464,6 +466,7 @@ export class BoardDataService implements OnInit{
   }
 
   saveNodes(board: Board) {
+    if (!this.boardService.instance) return;
     try {
       const elements = this.boardService.instance.getManagedElements();
       for (const key in elements) {

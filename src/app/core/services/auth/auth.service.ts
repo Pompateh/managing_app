@@ -2,14 +2,8 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { Router } from '@angular/router';
 import { tap, map } from 'rxjs/operators';
-
-export interface User {
-  id: string;
-  email: string;
-  name?: string;
-  role?: string;
-  lastLogin?: Date;
-}
+import { User, UserRole, UserStatus } from '../../models/user.model';
+import { UserService } from '../user/user.service';
 
 export interface AuthState {
   user: User | null;
@@ -39,7 +33,7 @@ export class AuthService {
   public user$ = this.state$.pipe(map(state => state.user));
   public isAuthenticated$ = this.state$.pipe(map(state => state.isAuthenticated));
 
-  constructor(private router: Router) {
+  constructor(private router: Router, private userService: UserService) {
     this.initializeFromStorage();
   }
 
@@ -91,17 +85,41 @@ export class AuthService {
           id: '1',
           email: this.ADMIN_EMAIL,
           name: 'Admin',
-          role: 'admin',
-          lastLogin: new Date()
+          role: UserRole.ADMIN,
+          status: UserStatus.ACTIVE,
+          createdAt: new Date(),
+          lastLogin: new Date(),
+          password: this.ADMIN_PASSWORD
         };
-        
         this.updateState({
           user,
           isAuthenticated: true,
           loading: false,
           error: null
         });
-        
+        this.persistToStorage(user);
+        return true;
+      }
+
+      // Try to authenticate as a collaborator/user
+      let user: User | undefined;
+      try {
+        user = this.userService.authenticateUser(email, password);
+      } catch (err: any) {
+        this.updateState({
+          loading: false,
+          error: err.message || 'Invalid email or password'
+        });
+        return false;
+      }
+
+      if (user) {
+        this.updateState({
+          user,
+          isAuthenticated: true,
+          loading: false,
+          error: null
+        });
         this.persistToStorage(user);
         return true;
       }
@@ -111,10 +129,10 @@ export class AuthService {
         error: 'Invalid email or password'
       });
       return false;
-    } catch (error) {
+    } catch (error: any) {
       this.updateState({
         loading: false,
-        error: 'An error occurred during login'
+        error: error.message || 'An error occurred during login'
       });
       return false;
     }
@@ -153,9 +171,12 @@ export class AuthService {
     const userRole = this.state.value.user?.role;
     if (!userRole) return false;
     
+    // Convert role to string for comparison
+    const userRoleStr = UserRole[userRole];
+    
     if (Array.isArray(role)) {
-      return role.includes(userRole);
+      return role.some(r => r === userRoleStr);
     }
-    return userRole === role;
+    return role === userRoleStr;
   }
 } 

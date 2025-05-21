@@ -1,6 +1,8 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { AuthService } from '../services/auth/auth.service';
+import { UserRole } from '../models/user.model';
+import { BoardDataService } from '../../shared/services/board-data/board-data.service';
 
 export interface AuthGuardData {
   roles?: string[];
@@ -13,6 +15,7 @@ export const authGuard: CanActivateFn = (
 ) => {
   const authService = inject(AuthService);
   const router = inject(Router);
+  const boardDataService = inject(BoardDataService);
   const guardData = route.data as AuthGuardData;
 
   console.log('Auth Guard - Current URL:', state.url);
@@ -56,6 +59,22 @@ export const authGuard: CanActivateFn = (
       router.navigate(['/404'], {
         queryParams: { 
           error: 'You do not have permission to access this page'
+        }
+      });
+      return false;
+    }
+  }
+
+  // Restrict viewers to only their assigned board
+  const user = authService.getCurrentUser();
+  if (user?.role === UserRole.VIEWER && state.url.startsWith('/board')) {
+    const boardId = route.queryParams['id'];
+    const board = boardDataService.getBoard(boardId);
+    if (!board || board.projectId !== user.assignedProjectId) {
+      console.log('Auth Guard - Viewer tried to access a board not assigned to them, redirecting to 404');
+      router.navigate(['/404'], {
+        queryParams: {
+          error: 'You do not have permission to access this board'
         }
       });
       return false;

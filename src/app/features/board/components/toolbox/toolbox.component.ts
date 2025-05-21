@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild, Input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { NodeService } from '../../services/node/node.service';
 import { CommonModule } from '@angular/common';
@@ -16,6 +16,8 @@ import { IconService } from '@shared-services/icon/icon.service';
 export class ToolboxComponent implements AfterViewInit {
 
   @ViewChild('toolbox',{static: true}) toolboxContainer!: ElementRef;
+  @Input() isViewer: boolean = false;
+  @Input() isAccepted: boolean = false;
 
   constructor(
     public nodeService: NodeService,

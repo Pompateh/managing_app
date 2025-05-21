@@ -23,4 +23,5 @@ export interface User {
   avatar?: string;
   department?: string;
   phoneNumber?: string;
+  assignedProjectId?: string;
 } 

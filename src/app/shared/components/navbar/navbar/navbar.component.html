@@ -1,4 +1,4 @@
-<nav [style.position]="fixed?'fixed':'relative'" style="z-index: 10;">
+<nav [style.position]="fixed ? 'fixed' : 'relative'" style="z-index: 10;">
   <div id="desktop-port">
     <div class="flex flex-row items-center">
       <a [routerLink]="isAuthenticated ? ['/projects'] : ['/']">
@@ -9,21 +9,21 @@
         <mat-icon svgIcon="chevron-down" class="icon-background-400 ms-2"></mat-icon>
       </button>
 
-      <a [routerLink]="['']" class="flex flex-row justify-center items-center ms-2 navbarButton" matTooltip="In progress 🚧">
-        <p class="font-semibold text-background-600">Download</p>
+      <a [routerLink]="['/projects']" class="flex flex-row justify-center items-center ms-2 navbarButton">
+        <p class="font-semibold">Projects</p>
       </a>
 
       <mat-menu #menu id="resourcesMenu" class="!bg-background-100 !px-2 !shadow border-[1px] border-background-400">
         <div class="!flex !flex-row ">
           <div class="!flex !flex-col me-6">
-            <a class="menuButton" [routerLink]="['/about']">About us</a>
+            <a class="menuButton" [routerLink]="['/support']">Support</a>
           </div>
         </div>
       </mat-menu>
     </div>
     <div class="flex flex-row items-center">
       <ng-container *ngFor="let item of buttons">
-          <app-simple-button
+        <app-simple-button
           (click)="item.click"
           [url]="item.url"
           [customStyles]="item.customStyles"
@@ -33,6 +33,19 @@
           [text]="item.text"
           [theme]="item.theme">
         </app-simple-button>
+      </ng-container>
+      <ng-container *ngIf="isAuthenticated">
+        <button class="flex flex-row justify-center items-center ms-2 navbarButton" [matMenuTriggerFor]="profileMenu">
+          <p class="font-semibold">Account</p>
+          <mat-icon svgIcon="chevron-down" class="icon-background-400 ms-2"></mat-icon>
+        </button>
+        <mat-menu #profileMenu id="profileMenu" class="!bg-background-100 !px-2 !shadow border-[1px] border-background-400">
+          <div class="!flex !flex-col">
+            <p class="menuButton">Role: {{ authService.getCurrentUser()?.role }}</p>
+            <a *ngIf="authService.getCurrentUser()?.role === UserRole.ADMIN" class="menuButton" [routerLink]="['/admin']">Admin Dashboard</a>
+            <button class="menuButton" (click)="logout()">Logout</button>
+          </div>
+        </mat-menu>
       </ng-container>
     </div>
   </div>

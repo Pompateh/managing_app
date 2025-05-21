@@ -3,6 +3,7 @@ import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { SimpleFormComponent } from '@shared-components/simple-form';
 import { AuthService } from '../../../../core/services/auth/auth.service';
 import { CommonModule } from '@angular/common';
+import { UserRole } from '../../../../core/models/user.model';
 
 @Component({
   selector: 'app-login',
@@ -33,11 +34,17 @@ export class LoginComponent implements OnInit {
       this.error = state.error;
       
       if (state.isAuthenticated) {
-        // Navigate to admin landing for admin users, or the return URL for others
-        if (state.user?.role === 'admin' && !this.route.snapshot.queryParams['returnUrl']) {
-          this.router.navigate(['/admin']);
-        } else {
+        // If a returnUrl is present, always use it
+        if (this.route.snapshot.queryParams['returnUrl']) {
           this.router.navigate([this.returnUrl]);
+        } else if (state.user?.role === UserRole.ADMIN) {
+          this.router.navigate(['/admin']);
+        } else if (state.user?.role === UserRole.MEMBER) {
+          this.router.navigate(['/projects']);
+        } else if (state.user?.role === UserRole.VIEWER && state.user.assignedProjectId) {
+          this.router.navigate([`/projects/${state.user.assignedProjectId}`]);
+        } else {
+          this.router.navigate(['/']); // fallback
         }
       }
     });

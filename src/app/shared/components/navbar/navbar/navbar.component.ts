@@ -9,6 +9,8 @@ import { Button } from '@custom-interfaces/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../../../core/services/auth/auth.service';
+import { Router } from '@angular/router';
+import { UserRole } from '../../../../core/models/user.model';
 
 @Component({
   selector: 'app-navbar',
@@ -29,11 +31,18 @@ export class NavbarComponent {
   @Input() fixed: boolean = true;
   @Input() buttons!: Button[];
   isAuthenticated: boolean = false;
+  UserRole = UserRole;
 
   constructor(
     private iconService: IconService,
-    private authService: AuthService
+    public authService: AuthService,
+    private router: Router
   ) {
     this.isAuthenticated = this.authService.isAuthenticated();
+  }
+
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

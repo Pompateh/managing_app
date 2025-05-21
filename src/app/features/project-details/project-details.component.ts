@@ -6,6 +6,7 @@ import { AuthService } from '../../core/services/auth/auth.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BoardDataService } from '../../shared/services/board-data/board-data.service';
+import { UserRole } from '../../core/models/user.model';
 
 @Component({
   selector: 'app-project-details',
@@ -209,7 +210,7 @@ export class ProjectDetailsComponent implements OnInit, OnDestroy {
     }
     
     const currentUser = this.authService.getCurrentUser();
-    this.isAdmin = currentUser?.role === 'admin';
+    this.isAdmin = currentUser?.role === UserRole.ADMIN;
   }
 
   getPhases() {

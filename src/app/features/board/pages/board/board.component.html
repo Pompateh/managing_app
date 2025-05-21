@@ -9,14 +9,27 @@
     ></context-menu-component>
 
     <controlpan-component></controlpan-component>
-    <navbar-component></navbar-component>
-    <toolbox-component></toolbox-component>
+    <app-board-navbar></app-board-navbar>
+    <toolbox-component [isViewer]="isViewer"></toolbox-component>
 
     <div #board id="board">
 
       <div #main id="main" class="polka">
 
       </div>
+    </div>
+
+    <!-- Done button for viewers -->
+    <button *ngIf="isViewer && !isAccepted" (click)="onDoneClick()" class="done-btn">Done</button>
+    <!-- Confirm dialog -->
+    <div *ngIf="showDoneDialog" class="confirm-dialog">
+      <p>Moodboard & Concept approve</p>
+      <button (click)="confirmAcceptBoard()">Confirm</button>
+      <button (click)="cancelAcceptBoard()">Cancel</button>
+    </div>
+    <!-- Read-only message -->
+    <div *ngIf="isAccepted" class="readonly-msg">
+      <p>This board is now read-only for all users.</p>
     </div>
 </main>
 
@@ -38,6 +51,3 @@
     <a [routerLink]="['/']" class="underline text-accent-base-800" id="mobile">Return to homepage</a>
     <a [routerLink]="['/account']" class="underline text-accent-base-800" id="desktop">Return to account</a>
   </div>
-
-
-

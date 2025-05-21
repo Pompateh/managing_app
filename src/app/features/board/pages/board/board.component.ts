@@ -9,31 +9,32 @@ import { ToolboxComponent } from '../../components/toolbox/toolbox.component';
 import { ControlpanComponent } from '../../components/controlpan/controlpan.component';
 import { NodeService } from '../../services/node/node.service';
 import { BoardService } from '@shared-services/board/board.service';
-import { NavbarComponent } from '../../components/navbar/navbar.component';
 import { BoardDataService } from '@shared-services/board-data/board-data.service';
 import { CookiesService } from '@core-services/cookies/cookies.service';
 import { Subject, debounceTime, fromEvent, takeUntil } from 'rxjs';
 import { ImageUploadModalComponent } from '../../components/image-upload-modal/image-upload-modal.component';
+import { UserService } from '@core-services/user/user.service';
+import { AuthService } from '@core-services/auth/auth.service';
+import { MatDialog } from '@angular/material/dialog';
+import { BoardNavbarComponent } from '../../components/board-navbar/board-navbar.component';
 
-@Component({ selector: 'board',
-    standalone: true,
-    templateUrl: './board.component.html',
-    styleUrl: './board.component.scss',
-    imports: [
-      RouterOutlet,
-      CommonModule,
-      MatIconModule,
-      NodeComponent,
-      ContextMenuComponent,
-      ToolboxComponent,
-      ControlpanComponent,
-      NavbarComponent,
-      RouterModule,
-      ImageUploadModalComponent
-    ],
-    providers: [HttpClient]
-  })
-
+@Component({
+  selector: 'app-board',
+  standalone: true,
+  imports: [
+    CommonModule,
+    RouterModule,
+    MatIconModule,
+    NodeComponent,
+    ContextMenuComponent,
+    ToolboxComponent,
+    ControlpanComponent,
+    ImageUploadModalComponent,
+    BoardNavbarComponent
+  ],
+  templateUrl: './board.component.html',
+  styleUrl: './board.component.scss'
+})
 export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private autoSaveDebouncer$ = new Subject<void>();
@@ -70,6 +71,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   @HostListener('window:keydown',['$event'])
     onKeyDown(event: KeyboardEvent) {
+      if(this.isAccepted) return;
       if(event.key === 'Delete' && this.nodeService.activeNode) {
         const activeNode = this.nodeService.activeNode
         this.nodeService.deleteNode(activeNode,this.renderer,this.nodeService)
@@ -96,6 +98,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
 
   editNode(attribute: string, value: string) {
+    if(this.isAccepted) return;
     if(!this.nodeService.activeNode) return;
     this.nodeService.editNode(attribute,this.nodeService.activeNode,this.renderer,value);
   }
@@ -162,6 +165,11 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     });
   }
 
+  isViewer: boolean = false;
+  isAccepted: boolean = false;
+  currentUserEmail: string = '';
+  showDoneDialog: boolean = false;
+
   constructor(
     public renderer: Renderer2,
     private activeRoute: ActivatedRoute,
@@ -169,7 +177,10 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     public boardService: BoardService,
     public boardData: BoardDataService,
     private cookiesService: CookiesService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private authService: AuthService,
+    private userService: UserService,
+    private dialog: MatDialog
   ) {
     boardService.appRenderer = renderer;
 
@@ -210,9 +221,15 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
     // Add window unload handler
     window.addEventListener('beforeunload', this.beforeUnloadHander.bind(this));
+
+    const user = this.authService.getCurrentUser();
+    this.isViewer = user?.role === 'VIEWER';
+    this.currentUserEmail = user?.email || '';
+    this.isAccepted = !!this.boardData.activeBoard?.accepted;
   }
 
   async ngAfterViewInit() {
+    console.log('[DEBUG] ngAfterViewInit called. isViewer:', this.isViewer);
     // Use NgZone to ensure proper initialization
     this.ngZone.runOutsideAngular(async () => {
       try {
@@ -300,6 +317,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   @HostListener('drop', ['$event'])
   onDrop(event: DragEvent) {
+    if (this.isAccepted) return;
     event.preventDefault();
     const type = event.dataTransfer?.getData('text');
     if (type === 'image') {
@@ -357,5 +375,35 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   closeImageModal() {
     this.showImageModal = false;
+  }
+
+  onDoneClick() {
+    this.showDoneDialog = true;
+  }
+
+  confirmAcceptBoard() {
+    // Set board as accepted and save
+    if (this.boardData.activeBoard) {
+      this.boardData.activeBoard.accepted = true;
+      this.boardData.activeBoard.acceptedBy = this.currentUserEmail;
+      this.boardData.saveData();
+      // Add notification for admin
+      const notifications = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
+      notifications.push({
+        type: 'concept_mood_accepted',
+        boardId: this.boardData.activeBoard.id,
+        acceptedBy: this.currentUserEmail,
+        date: new Date().toISOString()
+      });
+      localStorage.setItem('admin_notifications', JSON.stringify(notifications));
+      // Close board for viewer
+      this.isAccepted = true;
+      this.showDoneDialog = false;
+      // Optionally navigate away or show a message
+    }
+  }
+
+  cancelAcceptBoard() {
+    this.showDoneDialog = false;
   }
 }

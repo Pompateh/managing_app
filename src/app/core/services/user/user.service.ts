@@ -22,7 +22,7 @@ export class UserService {
     }
   }
 
-  private saveUsers(users: User[]) {
+  public saveUsers(users: User[]) {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users));
     this.usersSubject.next(users);
   }
@@ -69,7 +69,7 @@ export class UserService {
     return updatedUser;
   }
 
-  inviteUser(email: string, role: UserRole): User {
+  inviteUser(email: string, role: UserRole, assignedProjectId?: string): User {
     // Check if user already exists
     if (this.getUserByEmail(email)) {
       throw new Error('User with this email already exists');
@@ -82,7 +82,8 @@ export class UserService {
       status: UserStatus.ACTIVE, // Set to ACTIVE immediately
       createdAt: new Date(),
       lastLogin: null,
-      password: this.DEFAULT_PASSWORD
+      password: this.DEFAULT_PASSWORD,
+      ...(assignedProjectId ? { assignedProjectId } : {})
     };
 
     const currentUsers = this.usersSubject.value;
@@ -141,5 +142,14 @@ export class UserService {
   getUserActivity(userId: string): any[] {
     // TODO: Implement user activity tracking
     return [];
+  }
+
+  deleteUser(userId: string): User | undefined {
+    const currentUsers = this.usersSubject.value;
+    const userIndex = currentUsers.findIndex(user => user.id === userId);
+    if (userIndex === -1) return undefined;
+    const [deletedUser] = currentUsers.splice(userIndex, 1);
+    this.saveUsers(currentUsers);
+    return deletedUser;
   }
 } 

@@ -26,6 +26,7 @@ export class BoardService {
   }
   appRenderer!: Renderer2;
   lockDrag: boolean = false;
+  boardData!: BoardDataService;
 
   constructor(
     protected activeRoute: ActivatedRoute
@@ -229,7 +230,6 @@ export class BoardService {
   }
 
   bindJsPlumbEvents = (nodeService: NodeService, renderer:Renderer2, boardData: BoardDataService) => {
-
     this.instance.bind(jsplumb.EVENT_ENDPOINT_CLICK, (endpoint: jsplumb.Endpoint) => {
       const connection = endpoint.connections[0]
       nodeService.activeConnection = connection;
@@ -241,7 +241,6 @@ export class BoardService {
     })
 
     this.instance.bind(jsplumb.EVENT_ELEMENT_MOUSE_DOWN, (element:Element) =>{
-
       const abstractElement = renderer.selectRootElement(element,true)
       let targetElement = this.findParentByClass(abstractElement,'resizeButton');
       if(targetElement) {
@@ -277,29 +276,52 @@ export class BoardService {
       }
     })
 
-    this.instance.bind(jsplumb.INTERCEPT_BEFORE_DROP,(params: jsplumb.BeforeDropParams)=>{
-      const source = this.instance.getManagedElement(params.sourceId)
-      const target = this.instance.getManagedElement(params.targetId)
-      if(source === target) return
+    this.instance.bind(jsplumb.INTERCEPT_BEFORE_DROP, (params: jsplumb.BeforeDropParams) => {
+      if (this.boardData.activeBoard?.accepted) return false;
+      const sourceNode = this.instance.getManagedElement(params.sourceId);
+      const targetNode = this.instance.getManagedElement(params.targetId);
+
+      if (sourceNode === targetNode) return false;
+
+      // Check all connections for any between these two nodes (both directions)
+      let allConnectionsRaw = this.instance.getConnections({ scope: '*' });
+      const allConnections = Array.isArray(allConnectionsRaw) ? allConnectionsRaw : [];
+
+      const duplicate = allConnections.some((conn: any) =>
+        (conn.source === sourceNode && conn.target === targetNode) ||
+        (conn.source === targetNode && conn.target === sourceNode)
+      );
+
+      if (duplicate) return false;
+
+      // Create the connection with proper styling
+      console.log('[DEBUG] BoardService.instance.connect called', { source: sourceNode, target: targetNode });
       this.instance.connect({
-        source,
-        target,
+        source: sourceNode,
+        target: targetNode,
         connector: 'Bezier',
-        color: '#000000',
+        paintStyle: {
+          stroke: '#000000',
+          strokeWidth: 2
+        },
         anchor: 'Continuous',
         endpointStyle: {
           fill: '#030303',
-          stroke:  '#030303',
+          stroke: '#030303',
           strokeWidth: 1,
         }
-
-      })
-
-    })
+      });
+      return true;
+    });
 
     // Bind connection events to save connections
     this.instance.bind('connection', (info) => {
-      console.log('[jsPlumb] Connection event:', info);
+      console.log('[DEBUG] Connection event:', {
+        sourceId: info.connection.sourceId,
+        targetId: info.connection.targetId,
+        source: info.connection.source,
+        target: info.connection.target
+      });
       boardData.saveData();
     });
     this.instance.bind('connectionDetached', () => {
@@ -308,7 +330,6 @@ export class BoardService {
   }
 
   connectorsConfiguration = () => {
-
     this.instance.registerConnectionType('active',{
       paintStyle: {
         stroke: '#f0f0fe'
@@ -319,9 +340,9 @@ export class BoardService {
           cssClass: 'activeConnection',
         }
       }
-
     })
 
+    // Configure source endpoints for link actions
     this.instance.addSourceSelector('.linkAction',{
       anchor: 'Continuous',
       endpoint: "Dot",
@@ -333,8 +354,11 @@ export class BoardService {
       connectorStyle: {
         stroke: "#030303",
         strokeWidth: 2
-      }
+      },
+      maxConnections: -1
     })
+
+    // Configure target endpoints for nodes
     this.instance.addTargetSelector('.node',{
       anchor: 'Continuous',
       endpoint: "Dot",
@@ -346,12 +370,13 @@ export class BoardService {
       connectorStyle: {
         stroke: "#030303",
         strokeWidth: 2
-      }
+      },
+      maxConnections: -1
     })
   }
 
   init = (container: ElementRef, nodeService: NodeService, boardData: BoardDataService, renderer: Renderer2) => {
-
+    console.log('[DEBUG] BoardService.init called');
     const abstractElement = renderer.selectRootElement(container)
     this.panzoom = Panzoom(abstractElement.nativeElement, {
       canvas: true,

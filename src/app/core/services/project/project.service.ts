@@ -10,12 +10,55 @@ import { uuid } from '@jsplumb/browser-ui';
 })
 export class ProjectService {
   private projects$ = new BehaviorSubject<Project[]>([]);
+  private readonly STORAGE_KEY = 'projects';
 
   constructor(
     private authService: AuthService,
     private boardDataService: BoardDataService
   ) {
-    this.initializeMockProjects();
+    this.loadProjectsFromStorage();
+  }
+
+  private loadProjectsFromStorage() {
+    const storedProjects = localStorage.getItem(this.STORAGE_KEY);
+    if (storedProjects) {
+      const projects = JSON.parse(storedProjects);
+      // Convert string dates back to Date objects
+      projects.forEach((project: Project) => {
+        project.createdAt = new Date(project.createdAt);
+        project.deadline = new Date(project.deadline);
+        // Convert dates in phases
+        Object.values(project.phases).forEach(phase => {
+          if (phase.lastModified) {
+            phase.lastModified = new Date(phase.lastModified);
+          }
+          if (phase.comments) {
+            phase.comments.forEach(comment => {
+              comment.createdAt = new Date(comment.createdAt);
+            });
+          }
+          if (phase.subPhases) {
+            Object.values(phase.subPhases).forEach(subPhase => {
+              if (subPhase.lastModified) {
+                subPhase.lastModified = new Date(subPhase.lastModified);
+              }
+              if (subPhase.comments) {
+                subPhase.comments.forEach(comment => {
+                  comment.createdAt = new Date(comment.createdAt);
+                });
+              }
+            });
+          }
+        });
+      });
+      this.projects$.next(projects);
+    } else {
+      this.initializeMockProjects();
+    }
+  }
+
+  private saveProjectsToStorage(projects: Project[]) {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(projects));
   }
 
   private createDefaultPhaseContent(name: string, description: string = ''): PhaseContent {
@@ -111,6 +154,7 @@ export class ProjectService {
       
       projects[projectIndex] = project;
       this.projects$.next([...projects]);
+      this.saveProjectsToStorage(projects);
     }
   }
 
@@ -133,6 +177,7 @@ export class ProjectService {
       
       projects[projectIndex] = project;
       this.projects$.next([...projects]);
+      this.saveProjectsToStorage(projects);
     }
   }
 
@@ -151,6 +196,7 @@ export class ProjectService {
       
       projects[projectIndex] = project;
       this.projects$.next([...projects]);
+      this.saveProjectsToStorage(projects);
     }
   }
 
@@ -178,6 +224,7 @@ export class ProjectService {
       
       projects[projectIndex] = project;
       this.projects$.next([...projects]);
+      this.saveProjectsToStorage(projects);
     }
   }
 
@@ -249,6 +296,7 @@ export class ProjectService {
         const updatedProjects = [...projects];
         updatedProjects[index] = { ...project };
         this.projects$.next(updatedProjects);
+        this.saveProjectsToStorage(updatedProjects);
       } else {
         console.warn('Project not found for update:', project.id);
       }
@@ -256,5 +304,55 @@ export class ProjectService {
       console.error('Error updating project:', error);
       throw error;
     }
+  }
+
+  async createProject(projectData: Partial<Project>): Promise<Project> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) {
+      throw new Error('User must be authenticated to create a project');
+    }
+
+    const defaultPhases = {
+      brief: this.createDefaultPhaseContent('Brief', 'Initial project requirements and scope'),
+      contract: this.createDefaultPhaseContent('Contract', 'Legal agreements and terms'),
+      present: {
+        ...this.createDefaultPhaseContent('Present', 'Project presentation and review'),
+        subPhases: {
+          qa: this.createDefaultPhaseContent('Q&A', 'Questions and answers session'),
+          brandStory: this.createDefaultPhaseContent('Brand Story', 'Company narrative and values'),
+          conceptAndMood: this.createDefaultPhaseContent('Concept & Mood', 'Design direction and atmosphere'),
+          direction: this.createDefaultPhaseContent('Direction', 'Project trajectory and goals'),
+          phase: this.createDefaultPhaseContent('Phase', 'Project timeline and milestones')
+        }
+      },
+      timeline: this.createDefaultPhaseContent('Timeline', 'Project schedule and deadlines'),
+      deliveryFile: this.createDefaultPhaseContent('Delivery File', 'Final deliverables and assets')
+    };
+
+    const newProject: Project = {
+      id: uuid(),
+      name: projectData.name || 'Untitled Project',
+      description: projectData.description || '',
+      deadline: projectData.deadline || new Date(),
+      completionPercentage: 0,
+      status: projectData.status || ProjectStatus.NOT_STARTED,
+      createdAt: new Date(),
+      createdBy: currentUser.email,
+      teamMembers: projectData.teamMembers || [currentUser.email],
+      tasks: [],
+      phases: defaultPhases
+    };
+
+    const currentProjects = await firstValueFrom(this.projects$);
+    const updatedProjects = [...currentProjects, newProject];
+    this.projects$.next(updatedProjects);
+    this.saveProjectsToStorage(updatedProjects);
+
+    return newProject;
+  }
+
+  getProjectName(id: string): string {
+    const project = this.getProjectById(id);
+    return project ? project.name : '(Unknown Project)';
   }
 } 

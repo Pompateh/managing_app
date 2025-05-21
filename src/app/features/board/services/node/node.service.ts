@@ -153,12 +153,20 @@ export class NodeService {
 
     this.boardService.instance.manage(node)
 
-    // Configure endpoints
+    // Ensure node has a unique id
+    if (!node.id) {
+      node.id = 'node-' + Math.random().toString(36).substr(2, 9);
+    }
+    console.log('[DEBUG] Adding endpoint for node:', node.id);
+    // Remove all endpoints for this node before adding new ones
+    this.boardService.instance.removeAllEndpoints(node);
+    // Configure a single endpoint per node (both source and target)
     this.boardService.instance.addEndpoint(node, {
       anchor: 'Continuous',
       source: true,
       target: true,
-      maxConnections: -1,
+      maxConnections: 1,
+      uuid: node.id + '-endpoint',
       endpoint: 'Dot',
       paintStyle: { 
         fill: 'transparent',
@@ -220,12 +228,20 @@ export class NodeService {
 
     this.boardService.instance.manage(node,id)
 
-    // Configure endpoints
+    // Ensure node has a unique id
+    if (!node.id) {
+      node.id = 'node-' + Math.random().toString(36).substr(2, 9);
+    }
+    console.log('[DEBUG] Adding endpoint for node:', node.id);
+    // Remove all endpoints for this node before adding new ones
+    this.boardService.instance.removeAllEndpoints(node);
+    // Configure a single endpoint per node (both source and target)
     this.boardService.instance.addEndpoint(node, {
       anchor: 'Continuous',
       source: true,
       target: true,
-      maxConnections: -1,
+      maxConnections: 1,
+      uuid: node.id + '-endpoint',
       endpoint: 'Dot',
       paintStyle: { 
         fill: 'transparent',
@@ -381,12 +397,20 @@ export class NodeService {
     // Use nodeId if provided, otherwise let jsPlumb assign one
     this.boardService.instance.manage(node, nodeId);
 
-    // Configure endpoints
+    // Ensure node has a unique id
+    if (!node.id) {
+      node.id = 'node-' + Math.random().toString(36).substr(2, 9);
+    }
+    console.log('[DEBUG] Adding endpoint for node:', node.id);
+    // Remove all endpoints for this node before adding new ones
+    this.boardService.instance.removeAllEndpoints(node);
+    // Configure a single endpoint per node (both source and target)
     this.boardService.instance.addEndpoint(node, {
       anchor: 'Continuous',
       source: true,
       target: true,
-      maxConnections: -1,
+      maxConnections: 1,
+      uuid: node.id + '-endpoint',
       endpoint: 'Dot',
       paintStyle: { 
         fill: 'transparent',

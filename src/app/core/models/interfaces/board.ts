@@ -18,4 +18,6 @@ export interface Board {
   zoomScale: number,
   tag?: Tag[],
   favorite?: boolean,
+  accepted?: boolean,
+  acceptedBy?: string,
 }
