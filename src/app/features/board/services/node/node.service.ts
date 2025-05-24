@@ -112,14 +112,19 @@ export class NodeService {
       default:
         node = renderer.createElement('node-component')  as NgElement & WithProperties<{
           innerTextarea: string | null
-        }>;;
+        }>;
         nodeComponent = NodeComponent
         break;
     }
     const nodeComponentRef = createComponent(nodeComponent, {
       environmentInjector: this.injector,
       hostElement: node
-    })
+    });
+
+    // Pass isAccepted - safely handle undefined boardData
+    if (nodeComponentRef.instance.constructor.name === 'NodeComponent') {
+      (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData?.activeBoard?.accepted ?? false;
+    }
 
     let top = (y/this.boardService.zoomScale)-this.boardService.translation.y
     let left = (x/this.boardService.zoomScale)-this.boardService.translation.x
@@ -147,6 +152,8 @@ export class NodeService {
       (nodeComponentRef.instance as any).currentUserEmail = this.boardService.currentUserEmail;
       // Pass isViewer
       (nodeComponentRef.instance as any).isViewer = this.boardService.isViewer;
+      // Pass isAccepted
+      (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData.activeBoard?.accepted || false;
       console.log('[DEBUG] Creating node with currentUserEmail:', this.boardService.currentUserEmail);
     }
 
@@ -211,14 +218,19 @@ export class NodeService {
         break;
 
       default:
-        node = renderer.createElement('node-component')  as NgElement & WithProperties<NodeComponent>;;
+        node = renderer.createElement('node-component')  as NgElement & WithProperties<NodeComponent>;
         nodeComponent = NodeComponent
         break;
     }
     const nodeComponentRef = createComponent(nodeComponent, {
       environmentInjector: this.injector,
       hostElement: node
-    })
+    });
+
+    // Pass isAccepted - safely handle undefined boardData
+    if (nodeComponentRef.instance.constructor.name === 'NodeComponent') {
+      (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData?.activeBoard?.accepted ?? false;
+    }
 
     // Set position and size directly from saved values (no scaling)
     renderer.addClass(node,'nodeContainer')
@@ -246,6 +258,8 @@ export class NodeService {
       (nodeComponentRef.instance as any).currentUserEmail = this.boardService.currentUserEmail;
       // Pass isViewer
       (nodeComponentRef.instance as any).isViewer = this.boardService.isViewer;
+      // Pass isAccepted
+      (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData.activeBoard?.accepted || false;
       console.log('[DEBUG] Loading node with currentUserEmail:', this.boardService.currentUserEmail);
     }
 
@@ -410,6 +424,8 @@ export class NodeService {
       environmentInjector: this.injector
     });
     nodeComponentRef.instance.imageSrc = imageUrl;
+    // Pass isAccepted - safely handle undefined boardData
+    nodeComponentRef.instance.isAccepted = this.boardService.boardData?.activeBoard?.accepted ?? false;
 
     const node = nodeComponentRef.location.nativeElement;
     node.classList.add('nodeContainer', 'node', 'imageNode');

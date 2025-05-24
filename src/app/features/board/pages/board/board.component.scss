@@ -53,3 +53,42 @@ main {
   background-size: 16px 16px;
   background-color: rgb(250, 248, 241);
 }
+
+// Classes for disabling interactions
+.no-interact {
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: default !important;
+}
+
+.no-drag {
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+// When board is accepted
+:host-context(.accepted) {
+  .nodeContainer {
+    pointer-events: none !important;
+    user-select: none !important;
+    cursor: default !important;
+    
+    .desc {
+      pointer-events: none !important;
+      user-select: none !important;
+      cursor: default !important;
+    }
+    
+    .resizeButton,
+    .linkActionButton {
+      display: none !important;
+    }
+  }
+  
+  .jtk-connector,
+  .jtk-endpoint {
+    pointer-events: none !important;
+    user-select: none !important;
+    cursor: default !important;
+  }
+}

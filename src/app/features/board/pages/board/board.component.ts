@@ -17,6 +17,7 @@ import { UserService } from '@core-services/user/user.service';
 import { AuthService } from '@core-services/auth/auth.service';
 import { MatDialog } from '@angular/material/dialog';
 import { BoardNavbarComponent } from '../../components/board-navbar/board-navbar.component';
+import { Connection } from '@jsplumb/browser-ui';
 
 @Component({
   selector: 'app-board',
@@ -238,6 +239,64 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     this.isViewer = user?.role === 'VIEWER';
     this.currentUserEmail = user?.email ? user.email : '';
     this.isAccepted = !!this.boardData.activeBoard?.accepted;
+    
+    // If board is accepted, apply restrictions immediately
+    if (this.isAccepted) {
+      console.log('[DEBUG] Board is accepted, applying restrictions on init');
+      // Add accepted class to main container
+      const mainContainer = document.querySelector('#main');
+      if (mainContainer) {
+        this.renderer.addClass(mainContainer, 'accepted');
+      }
+      
+      // Disable all interactions
+      this.boardService.disablePanzoom();
+      this.nodeService.clearActiveConnection();
+      this.nodeService.clearActiveNote(this.renderer);
+      
+      // Disable all nodes
+      const nodes = document.querySelectorAll('.nodeContainer');
+      nodes.forEach(node => {
+        if (node instanceof HTMLElement) {
+          // Add no-interact class to disable all interactions
+          this.renderer.addClass(node, 'no-interact');
+          
+          // Disable text editing
+          const textarea = node.querySelector('.desc');
+          if (textarea instanceof HTMLElement) {
+            this.renderer.setAttribute(textarea, 'readonly', '');
+            this.renderer.setAttribute(textarea, 'disabled', '');
+            this.renderer.addClass(textarea, 'no-interact');
+          }
+          
+          // Hide resize and link buttons
+          const resizeButton = node.querySelector('.resizeButton');
+          const linkButton = node.querySelector('.linkActionButton');
+          if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
+          if (linkButton) this.renderer.addClass(linkButton, 'hidden');
+          
+          // Disable dragging by adding no-drag class
+          this.renderer.addClass(node, 'no-drag');
+        }
+      });
+      
+      // Disable all connections by adding no-interact class
+      const connections = document.querySelectorAll('.jtk-connector');
+      connections.forEach(conn => {
+        if (conn instanceof HTMLElement) {
+          this.renderer.addClass(conn, 'no-interact');
+        }
+      });
+      
+      // Disable all endpoints
+      const endpoints = document.querySelectorAll('.jtk-endpoint');
+      endpoints.forEach(endpoint => {
+        if (endpoint instanceof HTMLElement) {
+          this.renderer.addClass(endpoint, 'no-interact');
+        }
+      });
+    }
+    
     // Pass to BoardService for connection restrictions
     this.boardService.currentUserEmail = this.currentUserEmail;
     this.boardService.isViewer = this.isViewer;
@@ -419,21 +478,129 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     if (this.boardData.activeBoard) {
       this.boardData.activeBoard.accepted = true;
       this.boardData.activeBoard.acceptedBy = this.currentUserEmail;
-      this.boardData.saveData();
-      // Add notification for admin
-      const notifications = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
-      notifications.push({
-        type: 'concept_mood_accepted',
-        boardId: this.boardData.activeBoard.id,
-        acceptedBy: this.currentUserEmail,
-        date: new Date().toISOString()
+      
+      // Force save immediately
+      this.boardData.saveData().then(() => {
+        console.log('[DEBUG] Board saved as accepted');
+        
+        // Add notification for admin
+        const notifications = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
+        notifications.push({
+          type: 'concept_mood_accepted',
+          boardId: this.boardData.activeBoard.id,
+          acceptedBy: this.currentUserEmail,
+          date: new Date().toISOString()
+        });
+        localStorage.setItem('admin_notifications', JSON.stringify(notifications));
+        
+        // Set board as read-only for all users
+        this.isAccepted = true;
+        this.showDoneDialog = false;
+        
+        // Force disable all interactions
+        this.ngZone.run(() => {
+          // Add accepted class to main container
+          const mainContainer = document.querySelector('#main');
+          if (mainContainer) {
+            this.renderer.addClass(mainContainer, 'accepted');
+          }
+          
+          // Disable panzoom completely
+          this.boardService.disablePanzoom();
+          this.boardService.panzoom.destroy();
+          
+          // Clear any active states
+          this.nodeService.clearActiveConnection();
+          this.nodeService.clearActiveNote(this.renderer);
+          
+          // Disable all nodes
+          const nodes = document.querySelectorAll('.nodeContainer');
+          nodes.forEach(node => {
+            if (node instanceof HTMLElement) {
+              // Add no-interact class to disable all interactions
+              this.renderer.addClass(node, 'no-interact');
+              
+              // Disable text editing
+              const textarea = node.querySelector('.desc');
+              if (textarea instanceof HTMLElement) {
+                this.renderer.setAttribute(textarea, 'readonly', '');
+                this.renderer.setAttribute(textarea, 'disabled', '');
+                this.renderer.addClass(textarea, 'no-interact');
+                this.renderer.setStyle(textarea, 'pointer-events', 'none');
+              }
+              
+              // Hide resize and link buttons
+              const resizeButton = node.querySelector('.resizeButton');
+              const linkButton = node.querySelector('.linkActionButton');
+              if (resizeButton instanceof HTMLElement) {
+                this.renderer.addClass(resizeButton, 'hidden');
+                this.renderer.setStyle(resizeButton, 'display', 'none');
+              }
+              if (linkButton instanceof HTMLElement) {
+                this.renderer.addClass(linkButton, 'hidden');
+                this.renderer.setStyle(linkButton, 'display', 'none');
+              }
+              
+              // Disable dragging by adding no-drag class
+              this.renderer.addClass(node, 'no-drag');
+              this.renderer.setStyle(node, 'pointer-events', 'none');
+            }
+          });
+          
+          // Disable all connections
+          const connections = document.querySelectorAll('.jtk-connector');
+          connections.forEach(conn => {
+            if (conn instanceof HTMLElement) {
+              this.renderer.addClass(conn, 'no-interact');
+              this.renderer.setStyle(conn, 'pointer-events', 'none');
+            }
+          });
+          
+          // Disable all endpoints
+          const endpoints = document.querySelectorAll('.jtk-endpoint');
+          endpoints.forEach(endpoint => {
+            if (endpoint instanceof HTMLElement) {
+              this.renderer.addClass(endpoint, 'no-interact');
+              this.renderer.setStyle(endpoint, 'pointer-events', 'none');
+            }
+          });
+          
+          // Disable jsPlumb instance
+          if (this.boardService.instance) {
+            // Disable all interactions at the DOM level
+            const container = this.boardService.instance.getContainer();
+            if (container instanceof HTMLElement) {
+              // Add no-interact class to container
+              this.renderer.addClass(container, 'no-interact');
+              this.renderer.setStyle(container, 'pointer-events', 'none');
+              
+              // Disable all interactive elements within the container
+              const interactiveElements = container.querySelectorAll('*');
+              interactiveElements.forEach(element => {
+                if (element instanceof HTMLElement) {
+                  this.renderer.addClass(element, 'no-interact');
+                  this.renderer.setStyle(element, 'pointer-events', 'none');
+                }
+              });
+            }
+          }
+          
+          // Force a redraw
+          setTimeout(() => {
+            if (this.boardService.instance) {
+              this.boardService.instance.repaintEverything();
+            }
+          }, 100);
+        });
+      }).catch(error => {
+        console.error('[DEBUG] Error saving accepted board:', error);
       });
-      localStorage.setItem('admin_notifications', JSON.stringify(notifications));
-      // Close board for viewer
-      this.isAccepted = true;
-      this.showDoneDialog = false;
-      // Optionally navigate away or show a message
     }
+  }
+
+  // Helper method to check if board is read-only
+  isBoardReadOnly(): boolean {
+    return this.isAccepted;
   }
 
   cancelAcceptBoard() {

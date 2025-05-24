@@ -17,6 +17,7 @@ import { db } from '../../../../../db';
 import { SavedConnection } from '@custom-interfaces/saved-connection';
 import { SavedNode } from '@custom-interfaces/saved-node';
 import { Tag } from '@custom-interfaces/tag';
+import { AuthService } from '@core-services/auth/auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -44,9 +45,13 @@ export class BoardDataService implements OnInit{
     private router: Router,
     private cookieService: CookieService,
     private cookiesService: CookiesService,
+    private authService: AuthService
   ) {
     // Initialize boards array
     this._boards = [];
+    
+    // Initialize BoardService with this instance
+    this.boardService.setBoardData(this);
     
     // Subscribe to route changes
     this.activatedRoute.queryParamMap.subscribe((p) => {
@@ -75,11 +80,12 @@ export class BoardDataService implements OnInit{
       const boards = await this.getBoards();
       this.boards = boards;
       
-      // Set active board based on route params and project ID
+      // Get board ID from route params
       const id = this.activatedRoute.snapshot.queryParamMap.get('id');
       const projectId = history.state?.projectId;
       
       if (id) {
+        // Try to find the board with the given ID
         const selectedBoard = projectId 
           ? this.getBoard(id, projectId)
           : this.getBoard(id);
@@ -87,6 +93,20 @@ export class BoardDataService implements OnInit{
         if (selectedBoard) {
           this.activeBoard = selectedBoard;
           this.activeId = id;
+        } else {
+          // If board not found and user is viewer, redirect to their project details
+          const user = this.authService.getCurrentUser();
+          if (user?.role === 'VIEWER' && user.assignedProjectId) {
+            this.router.navigate(['/projects', user.assignedProjectId]);
+            return;
+          }
+        }
+      } else {
+        // If no board ID and user is viewer, redirect to their project details
+        const user = this.authService.getCurrentUser();
+        if (user?.role === 'VIEWER' && user.assignedProjectId) {
+          this.router.navigate(['/projects', user.assignedProjectId]);
+          return;
         }
       }
       
@@ -122,6 +142,66 @@ export class BoardDataService implements OnInit{
     const activeBoard: Board | undefined = this.getData(id);
 
     if(activeBoard) {
+      // Set the active board
+      this.activeBoard = activeBoard;
+      
+      // If board is accepted, apply restrictions immediately
+      if (activeBoard.accepted) {
+        console.log('[DEBUG] Board is accepted, applying restrictions');
+        // Add accepted class to main container
+        const mainContainer = document.querySelector('#main');
+        if (mainContainer) {
+          renderer.addClass(mainContainer, 'accepted');
+        }
+        
+        // Disable all interactions
+        this.boardService.disablePanzoom();
+        this.nodeService.clearActiveConnection();
+        this.nodeService.clearActiveNote(renderer);
+        
+        // Disable all nodes
+        const nodes = document.querySelectorAll('.nodeContainer');
+        nodes.forEach(node => {
+          if (node instanceof HTMLElement) {
+            // Add no-interact class to disable all interactions
+            renderer.addClass(node, 'no-interact');
+            
+            // Disable text editing
+            const textarea = node.querySelector('.desc');
+            if (textarea instanceof HTMLElement) {
+              renderer.setAttribute(textarea, 'readonly', '');
+              renderer.setAttribute(textarea, 'disabled', '');
+              renderer.addClass(textarea, 'no-interact');
+            }
+            
+            // Hide resize and link buttons
+            const resizeButton = node.querySelector('.resizeButton');
+            const linkButton = node.querySelector('.linkActionButton');
+            if (resizeButton) renderer.addClass(resizeButton, 'hidden');
+            if (linkButton) renderer.addClass(linkButton, 'hidden');
+            
+            // Disable dragging by adding no-drag class
+            renderer.addClass(node, 'no-drag');
+          }
+        });
+        
+        // Disable all connections by adding no-interact class
+        const connections = document.querySelectorAll('.jtk-connector');
+        connections.forEach(conn => {
+          if (conn instanceof HTMLElement) {
+            renderer.addClass(conn, 'no-interact');
+          }
+        });
+        
+        // Disable all endpoints
+        const endpoints = document.querySelectorAll('.jtk-endpoint');
+        endpoints.forEach(endpoint => {
+          if (endpoint instanceof HTMLElement) {
+            renderer.addClass(endpoint, 'no-interact');
+          }
+        });
+      }
+
       // Restore zoom and pan first
       const scale = activeBoard.zoomScale;
       this.boardService.zoomScale = scale;
@@ -173,13 +253,12 @@ export class BoardDataService implements OnInit{
         await Promise.all(nodePromises);
       }
 
-      // Now clear only connections, not nodes
+      // Restore connections
       if(activeBoard.connetions) {
-        const managedElements = this.boardService.instance.getManagedElements();
-        this.boardService.instance.deleteEveryConnection();
-        activeBoard.connetions.forEach((c: SavedConnection) => {
+        activeBoard.connetions.forEach(c => {
           const sourceEl = this.boardService.instance.getManagedElement(c.sourceId);
           const targetEl = this.boardService.instance.getManagedElement(c.targetId);
+
           let source;
           try {
             source = this.boardService.instance.getGroup(c.sourceId)?.el;

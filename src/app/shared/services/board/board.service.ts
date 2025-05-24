@@ -1,5 +1,6 @@
 import { ElementRef, Injectable, Renderer2 } from '@angular/core';
 import * as jsplumb from '@jsplumb/browser-ui'
+import { Connection } from '@jsplumb/browser-ui';
 import Panzoom, { PanzoomObject } from '@panzoom/panzoom';
 import { NodeService } from '../../../features/board/services/node/node.service';
 import { ActivatedRoute } from '@angular/router';
@@ -26,9 +27,10 @@ export class BoardService {
   }
   appRenderer!: Renderer2;
   lockDrag: boolean = false;
-  boardData!: BoardDataService;
+  private _boardData?: BoardDataService;
   currentUserEmail: string = '';
   isViewer: boolean = false;
+  private connectionMap: Map<string, Set<string>> = new Map();
 
   constructor(
     protected activeRoute: ActivatedRoute
@@ -38,8 +40,19 @@ export class BoardService {
       x: 0,
       y: 0,
     }
+  }
 
-   }
+  // Service locator pattern
+  setBoardData(boardData: BoardDataService) {
+    this._boardData = boardData;
+  }
+
+  get boardData(): BoardDataService {
+    if (!this._boardData) {
+      throw new Error('BoardDataService not initialized');
+    }
+    return this._boardData;
+  }
 
   public get instance() : jsplumb.JsPlumbInstance {
     return this._instance;
@@ -242,6 +255,113 @@ export class BoardService {
     nodeService.clearActiveConnection();
   }
 
+  connectorsConfiguration = () => {
+    // Configure default connection type
+    this.instance.registerConnectionType('default', {
+      connector: 'Bezier',
+      paintStyle: {
+        stroke: '#000000',
+        strokeWidth: 2
+      },
+      anchor: 'Continuous',
+      endpoints: [{
+        type: 'Dot',
+        options: {
+          fill: '#030303',
+          stroke: '#030303',
+          strokeWidth: 1
+        }
+      }, {
+        type: 'Dot',
+        options: {
+          fill: '#030303',
+          stroke: '#030303',
+          strokeWidth: 1
+        }
+      }]
+    });
+
+    // Set default connection type
+    this.instance.importDefaults({
+      connectionOverlays: [],
+      connector: 'Bezier',
+      paintStyle: {
+        stroke: '#000000',
+        strokeWidth: 2
+      },
+      anchor: 'Continuous',
+      endpoints: [{
+        type: 'Dot',
+        options: {
+          fill: '#030303',
+          stroke: '#030303',
+          strokeWidth: 1
+        }
+      }, {
+        type: 'Dot',
+        options: {
+          fill: '#030303',
+          stroke: '#030303',
+          strokeWidth: 1
+        }
+      }]
+    });
+
+    // Configure source endpoints for link actions
+    this.instance.addSourceSelector('.linkAction', {
+      anchor: 'Continuous',
+      endpoint: "Dot",
+      paintStyle: {
+        stroke: '#030303',
+        fill: '#030303',
+        strokeWidth: 1,
+      },
+      connectorStyle: {
+        stroke: "#030303",
+        strokeWidth: 2
+      },
+      maxConnections: -1
+    });
+
+    // Configure target endpoints for nodes
+    this.instance.addTargetSelector('.node', {
+      anchor: 'Continuous',
+      endpoint: "Dot",
+      paintStyle: {
+        stroke: '#030303',
+        fill: '#030303',
+        strokeWidth: 1,
+      },
+      connectorStyle: {
+        stroke: "#030303",
+        strokeWidth: 2
+      },
+      maxConnections: -1
+    });
+  }
+
+  private getConnectionKey(sourceId: string, targetId: string): string {
+    // Sort IDs to ensure consistent key regardless of connection direction
+    return [sourceId, targetId].sort().join('|');
+  }
+
+  private hasConnection(sourceId: string, targetId: string): boolean {
+    const key = this.getConnectionKey(sourceId, targetId);
+    return this.connectionMap.has(key);
+  }
+
+  private addConnection(sourceId: string, targetId: string) {
+    const key = this.getConnectionKey(sourceId, targetId);
+    if (!this.connectionMap.has(key)) {
+      this.connectionMap.set(key, new Set([sourceId, targetId]));
+    }
+  }
+
+  private removeConnection(sourceId: string, targetId: string) {
+    const key = this.getConnectionKey(sourceId, targetId);
+    this.connectionMap.delete(key);
+  }
+
   bindJsPlumbEvents = (nodeService: NodeService, renderer:Renderer2, boardData: BoardDataService) => {
     this.instance.bind(jsplumb.EVENT_ENDPOINT_CLICK, (endpoint: jsplumb.Endpoint) => {
       const connection = endpoint.connections[0]
@@ -273,15 +393,17 @@ export class BoardService {
       const abstractElement:Element = renderer.selectRootElement(element, true)
 
       let desc:Element | null = abstractElement.querySelector('.desc')
-      // Only allow removing readonly/disabled if not a viewer, or if viewer is the owner
+      // Only allow removing readonly/disabled if not a viewer, or if viewer is the owner, and board is not accepted
       const nodeCreator = (abstractElement as HTMLElement).dataset['createdByUserId'];
       const isViewer = this.isViewer;
       const currentUser = this.currentUserEmail;
+      const isAccepted = boardData.activeBoard?.accepted;
 
       if (
         desc &&
         (desc?.getAttribute('readonly') != '' || desc?.getAttribute('disabled') != '') &&
-        (!isViewer || nodeCreator === currentUser)
+        (!isViewer || nodeCreator === currentUser) &&
+        !isAccepted
       ) {
         try {
           let dragDiv:Element | null = abstractElement.querySelector('.dragDiv')
@@ -300,6 +422,7 @@ export class BoardService {
 
     this.instance.bind(jsplumb.INTERCEPT_BEFORE_DROP, (params: jsplumb.BeforeDropParams) => {
       if (this.boardData.activeBoard?.accepted) return false;
+      
       // Restrict viewers: only allow connecting their own nodes
       if (this.isViewer) {
         const sourceNode = this.instance.getManagedElement(params.sourceId) as HTMLElement;
@@ -311,53 +434,93 @@ export class BoardService {
           return false;
         }
       }
+
       const sourceNode = this.instance.getManagedElement(params.sourceId);
       const targetNode = this.instance.getManagedElement(params.targetId);
 
       if (sourceNode === targetNode) return false;
 
-      // Check all connections for any between these two nodes (both directions)
-      let allConnectionsRaw = this.instance.getConnections({ scope: '*' });
-      const allConnections = Array.isArray(allConnectionsRaw) ? allConnectionsRaw : [];
+      // Get all existing connections
+      const allConnections = this.instance.getConnections({ scope: '*' }) as Connection[];
+      
+      // Check for existing connections in both directions
+      const existingConnections = allConnections.filter((conn: Connection) => {
+        const sourceId = conn.sourceId;
+        const targetId = conn.targetId;
+        const newSourceId = params.sourceId;
+        const newTargetId = params.targetId;
+        
+        return (
+          (sourceId === newSourceId && targetId === newTargetId) ||
+          (sourceId === newTargetId && targetId === newSourceId)
+        );
+      });
 
-      const duplicate = allConnections.some((conn: any) =>
-        (conn.source === sourceNode && conn.target === targetNode) ||
-        (conn.source === targetNode && conn.target === sourceNode)
-      );
+      // If there are any existing connections, don't create a new one
+      if (existingConnections.length > 0) {
+        console.log('[DEBUG] Connection already exists, preventing duplicate:', {
+          sourceId: params.sourceId,
+          targetId: params.targetId,
+          existingConnections: existingConnections.map(c => ({
+            sourceId: c.sourceId,
+            targetId: c.targetId
+          }))
+        });
+        return false;
+      }
 
-      if (duplicate) return false;
+      // Create new connection using the default connection type
+      console.log('[DEBUG] Creating new connection:', {
+        sourceId: params.sourceId,
+        targetId: params.targetId
+      });
 
-      // Create the connection with proper styling
-      console.log('[DEBUG] BoardService.instance.connect called', { source: sourceNode, target: targetNode });
       this.instance.connect({
         source: sourceNode,
         target: targetNode,
-        connector: 'Bezier',
-        paintStyle: {
-          stroke: '#000000',
-          strokeWidth: 2
-        },
-        anchor: 'Continuous',
-        endpointStyle: {
-          fill: '#030303',
-          stroke: '#030303',
-          strokeWidth: 1,
-        }
+        type: 'default'
       });
+
       return true;
     });
 
     // Bind connection events to save connections
     this.instance.bind('connection', (info) => {
-      console.log('[DEBUG] Connection event:', {
-        sourceId: info.connection.sourceId,
-        targetId: info.connection.targetId,
-        source: info.connection.source,
-        target: info.connection.target
+      const sourceId = info.connection.sourceId;
+      const targetId = info.connection.targetId;
+
+      // Check if this connection already exists
+      if (this.hasConnection(sourceId, targetId)) {
+        console.log('[DEBUG] Preventing duplicate connection:', {
+          sourceId,
+          targetId
+        });
+        // Remove the duplicate connection
+        this.instance.deleteConnection(info.connection);
+        return;
+      }
+
+      console.log('[DEBUG] Creating new connection:', {
+        sourceId,
+        targetId
       });
+
+      // Add to our connection tracking
+      this.addConnection(sourceId, targetId);
       boardData.saveData();
     });
-    this.instance.bind('connectionDetached', () => {
+
+    this.instance.bind('connectionDetached', (info) => {
+      const sourceId = info.connection.sourceId;
+      const targetId = info.connection.targetId;
+      
+      console.log('[DEBUG] Connection detached:', {
+        sourceId,
+        targetId
+      });
+
+      // Remove from our connection tracking
+      this.removeConnection(sourceId, targetId);
       boardData.saveData();
     });
 
@@ -379,54 +542,11 @@ export class BoardService {
     });
   }
 
-  connectorsConfiguration = () => {
-    this.instance.registerConnectionType('active',{
-      paintStyle: {
-        stroke: '#f0f0fe'
-      },
-      endpoint: {
-        type: 'Rectangle',
-        options: {
-          cssClass: 'activeConnection',
-        }
-      }
-    })
-
-    // Configure source endpoints for link actions
-    this.instance.addSourceSelector('.linkAction',{
-      anchor: 'Continuous',
-      endpoint: "Dot",
-      paintStyle:{
-        stroke:'#030303',
-        fill: '#030303',
-        strokeWidth: 1,
-      },
-      connectorStyle: {
-        stroke: "#030303",
-        strokeWidth: 2
-      },
-      maxConnections: -1
-    })
-
-    // Configure target endpoints for nodes
-    this.instance.addTargetSelector('.node',{
-      anchor: 'Continuous',
-      endpoint: "Dot",
-      paintStyle:{
-        stroke:'#030303',
-        fill: '#030303',
-        strokeWidth: 1,
-      },
-      connectorStyle: {
-        stroke: "#030303",
-        strokeWidth: 2
-      },
-      maxConnections: -1
-    })
-  }
-
   init = (container: ElementRef, nodeService: NodeService, boardData: BoardDataService, renderer: Renderer2) => {
     console.log('[DEBUG] BoardService.init called');
+    // Clear connection map on init
+    this.connectionMap.clear();
+    
     const abstractElement = renderer.selectRootElement(container)
     this.panzoom = Panzoom(abstractElement.nativeElement, {
       canvas: true,

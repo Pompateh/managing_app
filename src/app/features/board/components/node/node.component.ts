@@ -11,18 +11,19 @@ import { CommonModule } from '@angular/common';
   styleUrl: './node.component.scss'
 })
 export class NodeComponent implements OnInit, OnChanges {
-  @Input() innerTextarea: string| null = null;
-  @Input() imageSrc: string | null = null;
+  @Input() isViewer: boolean = false;
   @Input() currentUserEmail: string = '';
   @Input() createdByUserId: string = '';
-  @Input() isViewer: boolean = false;
+  @Input() isAccepted: boolean = false;
+  @Input() imageSrc: string = '';
+  @Input() innerTextarea: string = '';
   imageFit: 'cover' | 'contain' | 'auto' = 'cover';
 
   constructor(iconService: IconService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     console.log('NodeComponent imageSrc:', this.imageSrc);
-    console.log('[DEBUG] NodeComponent: isViewer', this.isViewer, 'currentUserEmail', this.currentUserEmail, 'createdByUserId', this.createdByUserId, 'isLockedForViewer', this.isLockedForViewer);
+    console.log('[DEBUG] NodeComponent: isViewer', this.isViewer, 'currentUserEmail', this.currentUserEmail, 'createdByUserId', this.createdByUserId);
     setTimeout(() => {
       const textarea = document.querySelector(`textarea.desc.nodeElement`);
       if (textarea) {
@@ -42,7 +43,7 @@ export class NodeComponent implements OnInit, OnChanges {
       this.cdr.markForCheck();
     }
     if (changes['isViewer'] || changes['currentUserEmail'] || changes['createdByUserId']) {
-      console.log('[DEBUG] NodeComponent ngOnChanges: isViewer', this.isViewer, 'currentUserEmail', this.currentUserEmail, 'createdByUserId', this.createdByUserId, 'isLockedForViewer', this.isLockedForViewer);
+      console.log('[DEBUG] NodeComponent ngOnChanges: isViewer', this.isViewer, 'currentUserEmail', this.currentUserEmail, 'createdByUserId', this.createdByUserId);
       setTimeout(() => {
         const textarea = document.querySelector(`textarea.desc.nodeElement`);
         if (textarea) {

@@ -9,7 +9,7 @@
         <mat-icon svgIcon="chevron-down" class="icon-background-400 ms-2"></mat-icon>
       </button>
 
-      <a [routerLink]="['/projects']" class="flex flex-row justify-center items-center ms-2 navbarButton">
+      <a (click)="navigateToProjects()" class="flex flex-row justify-center items-center ms-2 navbarButton cursor-pointer">
         <p class="font-semibold">Projects</p>
       </a>
 

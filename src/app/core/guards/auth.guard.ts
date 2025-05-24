@@ -71,7 +71,23 @@ export const authGuard: CanActivateFn = (
     const boardId = route.queryParams['id'];
     const board = boardDataService.getBoard(boardId);
     if (!board || board.projectId !== user.assignedProjectId) {
-      console.log('Auth Guard - Viewer tried to access a board not assigned to them, redirecting to 404');
+      // Debug logging
+      console.log('Auth Guard - Viewer assignedProjectId:', user.assignedProjectId);
+      let boardsForProject: any[] = [];
+      let assignedBoard: any = undefined;
+      if (user.assignedProjectId) {
+        boardsForProject = boardDataService.getBoardsByProject(user.assignedProjectId);
+        assignedBoard = boardsForProject[0];
+      }
+      console.log('Auth Guard - Boards for assigned project:', boardsForProject);
+      console.log('Auth Guard - Assigned board found:', assignedBoard);
+      // Try to redirect to the assigned board instead of 404
+      if (user.assignedProjectId) {
+        if (assignedBoard) {
+          router.navigate(['/board'], { queryParams: { id: assignedBoard.id } });
+          return false;
+        }
+      }
       router.navigate(['/404'], {
         queryParams: {
           error: 'You do not have permission to access this board'

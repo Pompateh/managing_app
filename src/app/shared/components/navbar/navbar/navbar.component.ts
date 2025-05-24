@@ -45,4 +45,15 @@ export class NavbarComponent {
     this.authService.logout();
     this.router.navigate(['/login']);
   }
+
+  navigateToProjects() {
+    const user = this.authService.getCurrentUser();
+    if (user?.role === UserRole.VIEWER && user.assignedProjectId) {
+      // Redirect viewer to their assigned project
+      this.router.navigate(['/projects', user.assignedProjectId]);
+    } else {
+      // For other roles, go to projects list
+      this.router.navigate(['/projects']);
+    }
+  }
 }
