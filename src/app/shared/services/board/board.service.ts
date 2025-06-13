@@ -373,6 +373,33 @@ export class BoardService {
       nodeService.clearActiveConnection()
     })
 
+    this.instance.bind(jsplumb.EVENT_DRAG_STOP, () => {
+      // Safely repaint after drag
+      try {
+        // Get all connections
+        const connections = this.instance.getConnections({ scope: '*' }) as Connection[];
+        
+        // Validate each connection
+        connections.forEach(conn => {
+          const sourceEl = this.instance.getManagedElement(conn.sourceId);
+          const targetEl = this.instance.getManagedElement(conn.targetId);
+          
+          // If either element is missing, remove the connection
+          if (!sourceEl || !targetEl) {
+            this.instance.deleteConnection(conn);
+            return;
+          }
+        });
+
+        // Use requestAnimationFrame for smoother repaint
+        requestAnimationFrame(() => {
+          this.instance.repaintEverything();
+        });
+      } catch (error) {
+        console.error('[ERROR] Error during drag stop:', error);
+      }
+    })
+
     this.instance.bind(jsplumb.EVENT_ELEMENT_MOUSE_DOWN, (element:Element) =>{
       const abstractElement = renderer.selectRootElement(element,true)
       let targetElement = this.findParentByClass(abstractElement,'resizeButton');
@@ -475,10 +502,13 @@ export class BoardService {
         targetId: params.targetId
       });
 
-      this.instance.connect({
-        source: sourceNode,
-        target: targetNode,
-        type: 'default'
+      // Use requestAnimationFrame for smoother connection creation
+      requestAnimationFrame(() => {
+        this.instance.connect({
+          source: sourceNode,
+          target: targetNode,
+          type: 'default'
+        });
       });
 
       return true;
