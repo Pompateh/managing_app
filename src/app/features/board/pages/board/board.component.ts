@@ -479,6 +479,12 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
       this.boardData.activeBoard.accepted = true;
       this.boardData.activeBoard.acceptedBy = this.currentUserEmail;
       
+      // Update the board in the local boards array
+      const boardIndex = this.boardData.boards.findIndex(b => b.id === this.boardData.activeBoard.id);
+      if (boardIndex !== -1) {
+        this.boardData.boards[boardIndex] = { ...this.boardData.activeBoard };
+      }
+      
       // Force save immediately
       this.boardData.saveData().then(() => {
         console.log('[DEBUG] Board saved as accepted');

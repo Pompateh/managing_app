@@ -1,7 +1,7 @@
 import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,7 +12,35 @@ import { MatIconModule } from '@angular/material/icon';
 import { UserService } from '../../../core/services/user/user.service';
 import { User, UserRole, UserStatus } from '../../../core/models/user.model';
 import { ProjectService } from '../../../core/services/project/project.service';
-import { MatDialog } from '@angular/material/dialog';
+
+@Component({
+  selector: 'app-confirm-dialog',
+  template: `
+    <div class="p-6">
+      <h3 class="text-lg font-bold mb-4">Delete User</h3>
+      <p>Are you sure you want to delete this user? This action can be undone.</p>
+      <div class="flex justify-end gap-4 mt-6">
+        <button mat-button (click)="onCancel()">Cancel</button>
+        <button mat-raised-button color="warn" (click)="onConfirm()">Delete</button>
+      </div>
+    </div>
+  `,
+  standalone: true,
+  imports: [CommonModule, MatButtonModule]
+})
+export class ConfirmDialogComponent {
+  constructor(
+    public dialogRef: MatDialogRef<ConfirmDialogComponent>
+  ) {}
+
+  onCancel(): void {
+    this.dialogRef.close(false);
+  }
+
+  onConfirm(): void {
+    this.dialogRef.close(true);
+  }
+}
 
 @Component({
   selector: 'app-manage-roles-modal',
@@ -99,18 +127,6 @@ import { MatDialog } from '@angular/material/dialog';
       <div class="flex justify-end mt-6">
         <button mat-button (click)="onClose()">Close</button>
       </div>
-
-      <!-- Confirmation Dialog -->
-      <ng-template #confirmDialog let-dialogRef>
-        <div class="p-6">
-          <h3 class="text-lg font-bold mb-4">Delete User</h3>
-          <p>Are you sure you want to delete this user? This action can be undone.</p>
-          <div class="flex justify-end gap-4 mt-6">
-            <button mat-button (click)="dialogRef.close(false)">Cancel</button>
-            <button mat-raised-button color="warn" (click)="dialogRef.close(true)">Delete</button>
-          </div>
-        </div>
-      </ng-template>
     </div>
   `,
   styles: [`
@@ -227,7 +243,11 @@ export class ManageRolesModalComponent implements OnInit {
   }
 
   confirmDeleteUser(user: User) {
-    const dialogRef = this.dialog.open(this.confirmDialog);
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      disableClose: true
+    });
+
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.deleteUser(user);
@@ -236,21 +256,30 @@ export class ManageRolesModalComponent implements OnInit {
   }
 
   deleteUser(user: User) {
-    this.deletedUser = user;
-    this.deletedUserIndex = this.users.findIndex(u => u.id === user.id);
-    this.users = this.users.filter(u => u.id !== user.id);
-    this.userService.deleteUser(user.id);
-    this.snackBar.open('User deleted', 'Undo', {
-      duration: 5000,
-      horizontalPosition: 'end',
-      verticalPosition: 'top'
-    }).onAction().subscribe(() => {
-      if (this.deletedUser && this.deletedUserIndex !== null) {
-        this.users.splice(this.deletedUserIndex, 0, this.deletedUser);
-        this.userService.saveUsers(this.users);
-        this.deletedUser = null;
-        this.deletedUserIndex = null;
-      }
-    });
+    try {
+      this.deletedUser = user;
+      this.deletedUserIndex = this.users.findIndex(u => u.id === user.id);
+      this.users = this.users.filter(u => u.id !== user.id);
+      this.userService.deleteUser(user.id);
+      this.snackBar.open('User deleted', 'Undo', {
+        duration: 5000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      }).onAction().subscribe(() => {
+        if (this.deletedUser && this.deletedUserIndex !== null) {
+          this.users.splice(this.deletedUserIndex, 0, this.deletedUser);
+          this.userService.saveUsers(this.users);
+          this.deletedUser = null;
+          this.deletedUserIndex = null;
+        }
+      });
+    } catch (error) {
+      this.snackBar.open('Failed to delete user', 'Close', {
+        duration: 5000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top',
+        panelClass: ['error-snackbar']
+      });
+    }
   }
 } 

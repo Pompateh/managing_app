@@ -93,6 +93,63 @@ export class BoardDataService implements OnInit{
         if (selectedBoard) {
           this.activeBoard = selectedBoard;
           this.activeId = id;
+          
+          // If board is accepted, apply restrictions immediately
+          if (selectedBoard.accepted) {
+            console.log('[DEBUG] Board is accepted, applying restrictions on load');
+            // Add accepted class to main container
+            const mainContainer = document.querySelector('#main');
+            if (mainContainer) {
+              this.renderer.addClass(mainContainer, 'accepted');
+            }
+            
+            // Disable all interactions
+            this.boardService.disablePanzoom();
+            this.nodeService.clearActiveConnection();
+            this.nodeService.clearActiveNote(this.renderer);
+            
+            // Disable all nodes
+            const nodes = document.querySelectorAll('.nodeContainer');
+            nodes.forEach(node => {
+              if (node instanceof HTMLElement) {
+                // Add no-interact class to disable all interactions
+                this.renderer.addClass(node, 'no-interact');
+                
+                // Disable text editing
+                const textarea = node.querySelector('.desc');
+                if (textarea instanceof HTMLElement) {
+                  this.renderer.setAttribute(textarea, 'readonly', '');
+                  this.renderer.setAttribute(textarea, 'disabled', '');
+                  this.renderer.addClass(textarea, 'no-interact');
+                }
+                
+                // Hide resize and link buttons
+                const resizeButton = node.querySelector('.resizeButton');
+                const linkButton = node.querySelector('.linkActionButton');
+                if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
+                if (linkButton) this.renderer.addClass(linkButton, 'hidden');
+                
+                // Disable dragging by adding no-drag class
+                this.renderer.addClass(node, 'no-drag');
+              }
+            });
+            
+            // Disable all connections by adding no-interact class
+            const connections = document.querySelectorAll('.jtk-connector');
+            connections.forEach(conn => {
+              if (conn instanceof HTMLElement) {
+                this.renderer.addClass(conn, 'no-interact');
+              }
+            });
+            
+            // Disable all endpoints
+            const endpoints = document.querySelectorAll('.jtk-endpoint');
+            endpoints.forEach(endpoint => {
+              if (endpoint instanceof HTMLElement) {
+                this.renderer.addClass(endpoint, 'no-interact');
+              }
+            });
+          }
         } else {
           // If board not found and user is viewer, redirect to their project details
           const user = this.authService.getCurrentUser();
@@ -340,6 +397,7 @@ export class BoardDataService implements OnInit{
         zoomScale: 1,
         favorite: board.favorite,
         tag: board.tag,
+        accepted: board.accepted
       };
       
       this.boards.push(newBoard);
@@ -354,6 +412,7 @@ export class BoardDataService implements OnInit{
         elements: [],
         groups: [],
         zoomScale: 1,
+        accepted: false
       };
       
       this.boards.push(newBoard);
@@ -473,7 +532,8 @@ export class BoardDataService implements OnInit{
         projectId: board.projectId, // Ensure projectId is preserved
         elements: [],
         groups: [],
-        connetions: []
+        connetions: [],
+        accepted: board.accepted // Preserve the accepted state
       };
 
       // Save current state
@@ -492,7 +552,8 @@ export class BoardDataService implements OnInit{
             elements: boardToSave.elements,
             groups: boardToSave.groups,
             zoomScale: boardToSave.zoomScale,
-            dateCreated: boardToSave.dateCreated
+            dateCreated: boardToSave.dateCreated,
+            accepted: boardToSave.accepted // Include accepted state in update
           });
         } else {
           await db.boards.add(boardToSave);
