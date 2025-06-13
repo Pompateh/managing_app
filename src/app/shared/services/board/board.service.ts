@@ -590,10 +590,59 @@ export class BoardService {
 
     const jsInstance = jsplumb.newInstance({
       container: abstractElement.nativeElement,
-      elementsDraggable: true,
+      elementsDraggable: !boardData.activeBoard?.accepted, // Disable dragging if board is accepted
       allowNestedGroups: false
     });
     this.instance = jsInstance;
+
+    // If board is accepted, disable all interactions
+    if (boardData.activeBoard?.accepted) {
+      console.log('[DEBUG] Board is accepted, disabling all interactions');
+      // Disable panzoom
+      this.disablePanzoom();
+      
+      // Disable all nodes
+      const nodes = document.querySelectorAll('.nodeContainer');
+      nodes.forEach(node => {
+        if (node instanceof HTMLElement) {
+          // Add no-interact class to disable all interactions
+          renderer.addClass(node, 'no-interact');
+          
+          // Disable text editing
+          const textarea = node.querySelector('.desc');
+          if (textarea instanceof HTMLElement) {
+            renderer.setAttribute(textarea, 'readonly', '');
+            renderer.setAttribute(textarea, 'disabled', '');
+            renderer.addClass(textarea, 'no-interact');
+          }
+          
+          // Hide resize and link buttons
+          const resizeButton = node.querySelector('.resizeButton');
+          const linkButton = node.querySelector('.linkActionButton');
+          if (resizeButton) renderer.addClass(resizeButton, 'hidden');
+          if (linkButton) renderer.addClass(linkButton, 'hidden');
+          
+          // Disable dragging
+          renderer.addClass(node, 'no-drag');
+        }
+      });
+      
+      // Disable all connections
+      const connections = document.querySelectorAll('.jtk-connector');
+      connections.forEach(conn => {
+        if (conn instanceof HTMLElement) {
+          renderer.addClass(conn, 'no-interact');
+        }
+      });
+      
+      // Disable all endpoints
+      const endpoints = document.querySelectorAll('.jtk-endpoint');
+      endpoints.forEach(endpoint => {
+        if (endpoint instanceof HTMLElement) {
+          renderer.addClass(endpoint, 'no-interact');
+        }
+      });
+    }
 
     this.connectorsConfiguration()
     this.bindJsPlumbEvents(nodeService, renderer, boardData)
