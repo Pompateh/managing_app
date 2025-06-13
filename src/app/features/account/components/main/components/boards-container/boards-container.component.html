@@ -1,0 +1,30 @@
+<div class="boardsCard-container">
+  <div class="w-full sub-container justify-between px-2 py-2">
+    <button (click)="createBoard()" class="sub-container p-2" id="addBoard">
+      <mat-icon svgIcon="add"></mat-icon>
+    </button>
+    <div class="sub-container p-2 flex-grow !shadow-none" >
+      <mat-icon class="me-2" svgIcon="search"></mat-icon>
+      <input type="text" name="searchBoard" id="searchBoard" class="border-b-2 bg-transparent flex-grow outline-none px-2 w-2" (input)="setSearch($event)">
+    </div>
+  </div>
+  <ng-container *ngIf="boardData.boards.length !== 0; else emptyBoards">
+    <ng-container *ngIf="filteredBoards.length !== 0; else searchNotFound">
+      <div *ngFor="let item of filteredBoards;" class="board-card-container">
+        <board-container-card
+        [item]="item"
+        (editBoard)="editBoard($event,item.id)"></board-container-card>
+      </div>
+    </ng-container>
+    <ng-template #searchNotFound>
+      <div class="w-full flex-grow all-center">
+        <p>No results found for “{{input}}”</p>
+      </div>
+    </ng-template>
+  </ng-container>
+  <ng-template #emptyBoards class="w-full h-full">
+    <div class="w-full flex-grow all-center">
+      <p>No boards found. <button (click)="createBoard()" class="underline">Start creating!</button></p>
+    </div>
+  </ng-template>
+</div>

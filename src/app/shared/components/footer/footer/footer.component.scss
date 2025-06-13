@@ -1,0 +1,51 @@
+footer {
+  @apply bg-background-100 flex flex-row items-center justify-between py-12 px-6 w-full border-t-[1px] border-t-background-400;
+  box-shadow: 0 -1px 5px 0 rgb(0 0 0 / 0.1), 0 -1px 2px -1px rgb(0 0 0 / 0.1);
+
+
+  @media screen and (max-width: 900px) {
+    @apply px-3 flex-col-reverse;
+
+    #logoCP, #newstalgia {
+      @apply ms-2 self-start;
+    }
+
+    #logo-container {
+      @apply m-0 pt-10;
+    }
+  }
+
+  @media screen and (min-width: 900px) and (max-width: 1000px) {
+    @apply text-sm;
+  }
+}
+
+#footer-links-container {
+  section {
+    @apply p-2 mx-10 flex flex-col items-start;
+
+    span {
+      @apply font-semibold mb-2;
+    }
+  }
+
+  a, button {
+    @apply transition-all my-1;
+
+    &:hover {
+      @apply text-background-600 transition-all;
+    }
+  }
+
+  @media screen and (max-width: 768px) {
+    @apply flex-col items-start mb-6;
+
+    section {
+      @apply my-2 items-center p-2 mx-0 self-center;
+    }
+
+    a, button {
+      @apply my-2 underline;
+    }
+  }
+}

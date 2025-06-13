@@ -1,0 +1,21 @@
+<div class="template-container">
+  <button class="templateBoard" id="createBlank" (click)="boardData.createBoard()">
+    <mat-icon class="text-background-base-50 icon-white" svgIcon="add"></mat-icon>
+  </button>
+  <button
+    class="templateBoard"
+    id="sprint-retro"
+    (click)="boardData.createBoardFromTemplate('sprint-retro')"
+    matTooltip="Sprint retrospective"></button>
+  <button
+    class="templateBoard"
+    id="kanban"
+    (click)="boardData.createBoardFromTemplate('kanban')"
+    matTooltip="Kanban"></button>
+
+  <button
+    class="templateBoard"
+    id="useCase"
+    (click)="boardData.createBoardFromTemplate('useCase')"
+    matTooltip="Use case diagram"></button>
+</div>

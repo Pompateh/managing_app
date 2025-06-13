@@ -1,0 +1,50 @@
+<div class="min-h-screen">
+  <main>
+    <div class="login-container">
+      <div class="login-card">
+        <h1 class="title">Welcome to Newstalgia</h1>
+        
+        <!-- Error message -->
+        <div *ngIf="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <span class="block sm:inline">{{ error }}</span>
+    </div>
+
+    <app-simple-form
+          (formSubmit)="onSubmit($event)"
+    [fields]="[
+      {
+        label: 'Email',
+        type: 'email',
+              name: 'email',
+              aside: 'Enter your email'
+      },
+      {
+        label: 'Password',
+        type: 'password',
+              name: 'password',
+        aside: 'Forgot your password?'
+            }
+    ]"
+    [buttons]="[
+      {
+              text: loading ? 'Logging in...' : 'Log in',
+        theme: 'btn-primary',
+              elementType: 'submit'
+      },
+      {
+              text: loading ? 'Please wait...' : 'Log in with Google',
+        theme: 'btn-secondary',
+              elementType: 'button'
+            }
+    ]"
+    >
+    </app-simple-form>
+
+        <!-- Loading overlay -->
+        <div *ngIf="loading" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded">
+          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

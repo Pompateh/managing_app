@@ -1,0 +1,94 @@
+main {
+  @apply select-none absolute w-full h-full bg-background-300;
+
+  @media screen and (max-width: 768px){
+    @apply hidden;
+  }
+}
+
+#idNull {
+  @apply w-full h-full flex justify-center items-center flex-col bg-background-100 text-center p-2;
+
+  #desktop {
+    @apply flex;
+  }
+
+  #mobile {
+    @apply hidden;
+  }
+
+  @media screen and (max-width: 768px) {
+
+    #desktop {
+      @apply hidden;
+    }
+
+    #mobile {
+      @apply flex;
+    }
+
+  }
+}
+
+#mobile-msg {
+  @apply hidden;
+
+  @media screen and (max-width: 768px){
+    @apply flex items-center justify-center flex-col select-none absolute w-full h-full bg-background-100 px-5 text-center;
+  }
+}
+
+#board {
+  @apply w-full h-full absolute;
+}
+
+#main {
+  @apply bg-black absolute;
+}
+
+.polka {
+  background-image:
+    radial-gradient(rgb(5, 1, 21) 13.6%, transparent 13.6%);
+  background-position: 8px 8px;
+  background-size: 16px 16px;
+  background-color: rgb(250, 248, 241);
+}
+
+// Classes for disabling interactions
+.no-interact {
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: default !important;
+}
+
+.no-drag {
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+// When board is accepted
+:host-context(.accepted) {
+  .nodeContainer {
+    pointer-events: none !important;
+    user-select: none !important;
+    cursor: default !important;
+    
+    .desc {
+      pointer-events: none !important;
+      user-select: none !important;
+      cursor: default !important;
+    }
+    
+    .resizeButton,
+    .linkActionButton {
+      display: none !important;
+    }
+  }
+  
+  .jtk-connector,
+  .jtk-endpoint {
+    pointer-events: none !important;
+    user-select: none !important;
+    cursor: default !important;
+  }
+}
