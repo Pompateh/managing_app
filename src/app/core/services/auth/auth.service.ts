@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { tap, map } from 'rxjs/operators';
 import { User, UserRole, UserStatus } from '../../models/user.model';
 import { UserService } from '../user/user.service';
+import { Auth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from '@angular/fire/auth';
 
 export interface AuthState {
   user: User | null;
@@ -23,36 +24,40 @@ const INITIAL_STATE: AuthState = {
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly STORAGE_KEY = 'auth_state';
-  private readonly ADMIN_EMAIL = 'newstalgia39@gmail.com';
-  private readonly ADMIN_PASSWORD = 'justdoit';
-  private readonly TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-
   private state = new BehaviorSubject<AuthState>(INITIAL_STATE);
   public state$ = this.state.asObservable();
   public user$ = this.state$.pipe(map(state => state.user));
   public isAuthenticated$ = this.state$.pipe(map(state => state.isAuthenticated));
 
-  constructor(private router: Router, private userService: UserService) {
-    this.initializeFromStorage();
-  }
-
-  private initializeFromStorage(): void {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (stored) {
-        const { user, timestamp } = JSON.parse(stored);
-        // Check if the stored session is still valid (24 hours)
-        if (user && timestamp && (Date.now() - timestamp) < this.TOKEN_EXPIRY) {
-          this.updateState({ user, isAuthenticated: true, loading: false, error: null });
-        } else {
-          this.logout(); // Clear expired session
-        }
+  constructor(
+    private router: Router, 
+    private userService: UserService,
+    private auth: Auth
+  ) {
+    // Listen to Firebase auth state changes
+    onAuthStateChanged(this.auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // Convert Firebase user to our User model
+        const user: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: firebaseUser.displayName || '',
+          role: UserRole.ADMIN, // You might want to store this in Firestore
+          status: UserStatus.ACTIVE,
+          createdAt: new Date(),
+          lastLogin: new Date(),
+          password: '' // Firebase handles password, so we don't need to store it
+        };
+        this.updateState({
+          user,
+          isAuthenticated: true,
+          loading: false,
+          error: null
+        });
+      } else {
+        this.updateState(INITIAL_STATE);
       }
-    } catch (error) {
-      console.error('Error reading auth state:', error);
-      this.logout();
-    }
+    });
   }
 
   private updateState(partialState: Partial<AuthState>): void {
@@ -62,77 +67,16 @@ export class AuthService {
     });
   }
 
-  private persistToStorage(user: User | null): void {
-    if (user) {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
-        user,
-        timestamp: Date.now()
-      }));
-    } else {
-      localStorage.removeItem(this.STORAGE_KEY);
-    }
-  }
-
   async login(email: string, password: string): Promise<boolean> {
     this.updateState({ loading: true, error: null });
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      if (email === this.ADMIN_EMAIL && password === this.ADMIN_PASSWORD) {
-        const user: User = {
-          id: '1',
-          email: this.ADMIN_EMAIL,
-          name: 'Admin',
-          role: UserRole.ADMIN,
-          status: UserStatus.ACTIVE,
-          createdAt: new Date(),
-          lastLogin: new Date(),
-          password: this.ADMIN_PASSWORD
-        };
-        this.updateState({
-          user,
-          isAuthenticated: true,
-          loading: false,
-          error: null
-        });
-        this.persistToStorage(user);
-        return true;
-      }
-
-      // Try to authenticate as a collaborator/user
-      let user: User | undefined;
-      try {
-        user = this.userService.authenticateUser(email, password);
-      } catch (err: any) {
-        this.updateState({
-          loading: false,
-          error: err.message || 'Invalid email or password'
-        });
-        return false;
-      }
-
-      if (user) {
-        this.updateState({
-          user,
-          isAuthenticated: true,
-          loading: false,
-          error: null
-        });
-        this.persistToStorage(user);
-        return true;
-      }
-
-      this.updateState({
-        loading: false,
-        error: 'Invalid email or password'
-      });
-      return false;
+      const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+      return true;
     } catch (error: any) {
       this.updateState({
         loading: false,
-        error: error.message || 'An error occurred during login'
+        error: error.message || 'Invalid email or password'
       });
       return false;
     }
@@ -145,10 +89,14 @@ export class AuthService {
     return false;
   }
 
-  logout(): void {
-    this.updateState(INITIAL_STATE);
-    this.persistToStorage(null);
-    this.router.navigate(['/login']);
+  async logout(): Promise<void> {
+    try {
+      await signOut(this.auth);
+      this.updateState(INITIAL_STATE);
+      this.router.navigate(['/login']);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   }
 
   isAuthenticated(): boolean {
@@ -171,7 +119,6 @@ export class AuthService {
     const userRole = this.state.value.user?.role;
     if (!userRole) return false;
     
-    // Convert role to string for comparison
     const userRoleStr = UserRole[userRole];
     
     if (Array.isArray(role)) {

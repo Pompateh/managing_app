@@ -12,29 +12,29 @@ import { TemplateBoard } from '../../../core/models/types/template-board';
 import sprintRetro2 from '@core-board-templates/sprint-retrospective2';
 import sprintRetro from '@core-board-templates/sprint-retrospective';
 import useCase from '@core-board-templates/usecase';
-import Dexie from 'dexie';
-import { db } from '../../../../../db';
+import { db } from '../../../firebase.config';
+import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { SavedConnection } from '@custom-interfaces/saved-connection';
 import { SavedNode } from '@custom-interfaces/saved-node';
 import { Tag } from '@custom-interfaces/tag';
 import { AuthService } from '@core-services/auth/auth.service';
+import { Observable, from, of } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
 })
-export class BoardDataService implements OnInit{
-
+export class BoardDataService implements OnInit {
   _boards: Board[] = [];
   activeId!: string;
   activeBoard!: Board;
   renderer!: Renderer2;
 
-
-  public get boards() : Board[] {
+  public get boards(): Board[] {
     return this._boards;
-}
+  }
 
-  public set boards(v : Board[]) {
+  public set boards(v: Board[]) {
     this._boards = v;
   }
 
@@ -47,13 +47,9 @@ export class BoardDataService implements OnInit{
     private cookiesService: CookiesService,
     private authService: AuthService
   ) {
-    // Initialize boards array
     this._boards = [];
-    
-    // Initialize BoardService with this instance
     this.boardService.setBoardData(this);
     
-    // Subscribe to route changes
     this.activatedRoute.queryParamMap.subscribe((p) => {
       const newId = p.get("id") ?? '';
       if (newId !== this.activeId) {
@@ -65,14 +61,16 @@ export class BoardDataService implements OnInit{
       }
     });
 
-    // Load boards with error handling
     this.loadBoards().catch(error => {
       console.error('Error loading boards:', error);
     });
   }
 
   async deleteAll() {
-    db.boards.clear();
+    const boardsRef = collection(db, 'boards');
+    const snapshot = await getDocs(boardsRef);
+    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
   }
 
   async loadBoards() {
@@ -80,12 +78,10 @@ export class BoardDataService implements OnInit{
       const boards = await this.getBoards();
       this.boards = boards;
       
-      // Get board ID from route params
       const id = this.activatedRoute.snapshot.queryParamMap.get('id');
       const projectId = history.state?.projectId;
       
       if (id) {
-        // Try to find the board with the given ID
         const selectedBoard = projectId 
           ? this.getBoard(id, projectId)
           : this.getBoard(id);
@@ -94,64 +90,10 @@ export class BoardDataService implements OnInit{
           this.activeBoard = selectedBoard;
           this.activeId = id;
           
-          // If board is accepted, apply restrictions immediately
           if (selectedBoard.accepted) {
-            console.log('[DEBUG] Board is accepted, applying restrictions on load');
-            // Add accepted class to main container
-            const mainContainer = document.querySelector('#main');
-            if (mainContainer) {
-              this.renderer.addClass(mainContainer, 'accepted');
-            }
-            
-            // Disable all interactions
-            this.boardService.disablePanzoom();
-            this.nodeService.clearActiveConnection();
-            this.nodeService.clearActiveNote(this.renderer);
-            
-            // Disable all nodes
-            const nodes = document.querySelectorAll('.nodeContainer');
-            nodes.forEach(node => {
-              if (node instanceof HTMLElement) {
-                // Add no-interact class to disable all interactions
-                this.renderer.addClass(node, 'no-interact');
-                
-                // Disable text editing
-                const textarea = node.querySelector('.desc');
-                if (textarea instanceof HTMLElement) {
-                  this.renderer.setAttribute(textarea, 'readonly', '');
-                  this.renderer.setAttribute(textarea, 'disabled', '');
-                  this.renderer.addClass(textarea, 'no-interact');
-                }
-                
-                // Hide resize and link buttons
-                const resizeButton = node.querySelector('.resizeButton');
-                const linkButton = node.querySelector('.linkActionButton');
-                if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
-                if (linkButton) this.renderer.addClass(linkButton, 'hidden');
-                
-                // Disable dragging by adding no-drag class
-                this.renderer.addClass(node, 'no-drag');
-              }
-            });
-            
-            // Disable all connections by adding no-interact class
-            const connections = document.querySelectorAll('.jtk-connector');
-            connections.forEach(conn => {
-              if (conn instanceof HTMLElement) {
-                this.renderer.addClass(conn, 'no-interact');
-              }
-            });
-            
-            // Disable all endpoints
-            const endpoints = document.querySelectorAll('.jtk-endpoint');
-            endpoints.forEach(endpoint => {
-              if (endpoint instanceof HTMLElement) {
-                this.renderer.addClass(endpoint, 'no-interact');
-              }
-            });
+            this.applyBoardRestrictions();
           }
         } else {
-          // If board not found and user is viewer, redirect to their project details
           const user = this.authService.getCurrentUser();
           if (user?.role === 'VIEWER' && user.assignedProjectId) {
             this.router.navigate(['/projects', user.assignedProjectId]);
@@ -159,7 +101,6 @@ export class BoardDataService implements OnInit{
           }
         }
       } else {
-        // If no board ID and user is viewer, redirect to their project details
         const user = this.authService.getCurrentUser();
         if (user?.role === 'VIEWER' && user.assignedProjectId) {
           this.router.navigate(['/projects', user.assignedProjectId]);
@@ -176,9 +117,13 @@ export class BoardDataService implements OnInit{
     }
   }
 
-  async getBoards():Promise<Board[]> {
-    const boards = await db.boards.toArray();
-    return boards;
+  async getBoards(): Promise<Board[]> {
+    const boardsRef = collection(db, 'boards');
+    const snapshot = await getDocs(boardsRef);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Board));
   }
 
   getBoard(id: string, projectId?: string) {
@@ -382,42 +327,24 @@ export class BoardDataService implements OnInit{
     }
   }
 
-  createBoard(board?: Board, clearNotes?: boolean, projectId?: string): string {
-    const id = uuid();
+  async createBoard(board?: Board, clearNotes?: boolean, projectId?: string): Promise<string> {
+    const newBoard = {
+      projectId: projectId ?? board?.projectId,
+      dateCreated: new Date(),
+      name: board?.name ?? 'Untitled board',
+      connetions: board?.connetions ?? [],
+      elements: board?.elements ?? [],
+      groups: board?.groups ?? [],
+      zoomScale: 1,
+      favorite: board?.favorite ?? false,
+      tag: board?.tag,
+      accepted: board?.accepted ?? false
+    };
 
-    if(board) {
-      const newBoard = {
-        id,
-        projectId: projectId ?? board.projectId,
-        dateCreated: board.dateCreated,
-        name: board.name,
-        connetions: board.connetions,
-        elements: board.elements,
-        groups: board.groups,
-        zoomScale: 1,
-        favorite: board.favorite,
-        tag: board.tag,
-        accepted: board.accepted
-      };
-      
-      this.boards.push(newBoard);
-      db.boards.add(newBoard);
-    } else {
-      const newBoard = {
-        id,
-        projectId,
-        dateCreated: new Date(),
-        name: `Untitled board`,
-        connetions: [],
-        elements: [],
-        groups: [],
-        zoomScale: 1,
-        accepted: false
-      };
-      
-      this.boards.push(newBoard);
-      db.boards.add(newBoard);
-    }
+    const docRef = await addDoc(collection(db, 'boards'), newBoard);
+    const id = docRef.id;
+    
+    this.boards.push({ ...newBoard, id });
 
     if(clearNotes && this.boardService && this.boardService.instance) {
       try {
@@ -500,12 +427,9 @@ export class BoardDataService implements OnInit{
   }
 
   async saveData() {
-    // Check if cookies are accepted
     if (!this.cookiesService.accepted) {
       const cookiesAccepted = await this.checkAndAcceptCookies();
-      if (!cookiesAccepted) {
-        return false;
-      }
+      if (!cookiesAccepted) return false;
     }
 
     try {
@@ -526,51 +450,38 @@ export class BoardDataService implements OnInit{
         return false;
       }
 
-      // Create a new board object to prevent reference issues
       const boardToSave = {
         ...board,
-        projectId: board.projectId, // Ensure projectId is preserved
+        projectId: board.projectId,
         elements: [],
         groups: [],
         connetions: [],
-        accepted: board.accepted // Preserve the accepted state
+        accepted: board.accepted
       };
 
-      // Save current state
       this.saveConnections(boardToSave);
       this.saveNodes(boardToSave);
       boardToSave.zoomScale = this.boardService.panzoom.getScale();
 
-      // Update or add to database
-      try {
-        const boardInDb = await db.boards.get(boardToSave.id);
-        if (boardInDb) {
-          await db.boards.update(boardToSave.id, {
-            name: boardToSave.name,
-            projectId: boardToSave.projectId,
-            connetions: boardToSave.connetions,
-            elements: boardToSave.elements,
-            groups: boardToSave.groups,
-            zoomScale: boardToSave.zoomScale,
-            dateCreated: boardToSave.dateCreated,
-            accepted: boardToSave.accepted // Include accepted state in update
-          });
-        } else {
-          await db.boards.add(boardToSave);
-        }
+      const boardRef = doc(db, 'boards', id);
+      await updateDoc(boardRef, {
+        name: boardToSave.name,
+        projectId: boardToSave.projectId,
+        connetions: boardToSave.connetions,
+        elements: boardToSave.elements,
+        groups: boardToSave.groups,
+        zoomScale: boardToSave.zoomScale,
+        dateCreated: boardToSave.dateCreated,
+        accepted: boardToSave.accepted
+      });
 
-        // Update local state
-        const index = this.boards.findIndex(b => b.id === boardToSave.id);
-        if (index !== -1) {
-          this.boards[index] = boardToSave;
-        }
-
-        console.log('Board saved successfully:', boardToSave.id);
-        return true;
-      } catch (dbError) {
-        console.error('Database error while saving board:', dbError);
-        return false;
+      const index = this.boards.findIndex(b => b.id === boardToSave.id);
+      if (index !== -1) {
+        this.boards[index] = boardToSave;
       }
+
+      console.log('Board saved successfully:', boardToSave.id);
+      return true;
     } catch (error) {
       console.error('Error saving board data:', error);
       return false;
@@ -700,52 +611,33 @@ export class BoardDataService implements OnInit{
   }
 
   deleteBoard(id: string) {
-    let newBoards: Board[] = this.boards.filter((board: Board)=>{
-      if(board.id === id) {
-        return false;
-      }
-      return true;
-    })
-    this.boards = newBoards;
-    db.boards.delete(id);
+    this.boards = this.boards.filter(board => board.id !== id);
+    deleteDoc(doc(db, 'boards', id));
   }
 
   toggleFavorite(id: string) {
-
-    let newBoards: Board[] = this.boards.map(element=>{
-      if(element.id === id) {
-        if(element.favorite) {
-          element.favorite = !element.favorite;
-
-        } else {
-          element.favorite = true;
-        }
-
-        db.boards.update(id, {
-          favorite: element.favorite
+    this.boards = this.boards.map(board => {
+      if(board.id === id) {
+        const newFavorite = !board.favorite;
+        updateDoc(doc(db, 'boards', id), {
+          favorite: newFavorite
         });
+        return { ...board, favorite: newFavorite };
       }
-      return element
-    })
-
-    this.boards = newBoards;
+      return board;
+    });
   }
 
   editBoardName(id: string, name: string) {
-    let newBoards: Board[] = this.boards.map((board: Board)=>{
+    this.boards = this.boards.map(board => {
       if(board.id === id) {
-        return {
-          ...board,
-          name,
-        }
+        updateDoc(doc(db, 'boards', id), {
+          name
+        });
+        return { ...board, name };
       }
-      return board
-    })
-    db.boards.update(id, {
-      name,
+      return board;
     });
-
-    this.boards = newBoards;
   }
 
   toggleTag(tag: Tag,id: string) {
@@ -761,5 +653,61 @@ export class BoardDataService implements OnInit{
 
   ngOnInit(): void {
     this.activeId = this.activatedRoute.snapshot.paramMap.get('id') ?? 'null';
+  }
+
+  private applyBoardRestrictions() {
+    console.log('[DEBUG] Board is accepted, applying restrictions');
+    // Add accepted class to main container
+    const mainContainer = document.querySelector('#main');
+    if (mainContainer) {
+      this.renderer.addClass(mainContainer, 'accepted');
+    }
+    
+    // Disable all interactions
+    this.boardService.disablePanzoom();
+    this.nodeService.clearActiveConnection();
+    this.nodeService.clearActiveNote(this.renderer);
+    
+    // Disable all nodes
+    const nodes = document.querySelectorAll('.nodeContainer');
+    nodes.forEach(node => {
+      if (node instanceof HTMLElement) {
+        // Add no-interact class to disable all interactions
+        this.renderer.addClass(node, 'no-interact');
+        
+        // Disable text editing
+        const textarea = node.querySelector('.desc');
+        if (textarea instanceof HTMLElement) {
+          this.renderer.setAttribute(textarea, 'readonly', '');
+          this.renderer.setAttribute(textarea, 'disabled', '');
+          this.renderer.addClass(textarea, 'no-interact');
+        }
+        
+        // Hide resize and link buttons
+        const resizeButton = node.querySelector('.resizeButton');
+        const linkButton = node.querySelector('.linkActionButton');
+        if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
+        if (linkButton) this.renderer.addClass(linkButton, 'hidden');
+        
+        // Disable dragging by adding no-drag class
+        this.renderer.addClass(node, 'no-drag');
+      }
+    });
+    
+    // Disable all connections by adding no-interact class
+    const connections = document.querySelectorAll('.jtk-connector');
+    connections.forEach(conn => {
+      if (conn instanceof HTMLElement) {
+        this.renderer.addClass(conn, 'no-interact');
+      }
+    });
+    
+    // Disable all endpoints
+    const endpoints = document.querySelectorAll('.jtk-endpoint');
+    endpoints.forEach(endpoint => {
+      if (endpoint instanceof HTMLElement) {
+        this.renderer.addClass(endpoint, 'no-interact');
+      }
+    });
   }
 }
