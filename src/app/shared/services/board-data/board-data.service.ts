@@ -12,29 +12,28 @@ import { TemplateBoard } from '../../../core/models/types/template-board';
 import sprintRetro2 from '@core-board-templates/sprint-retrospective2';
 import sprintRetro from '@core-board-templates/sprint-retrospective';
 import useCase from '@core-board-templates/usecase';
-import Dexie from 'dexie';
-import { db } from '../../../../../db';
 import { SavedConnection } from '@custom-interfaces/saved-connection';
 import { SavedNode } from '@custom-interfaces/saved-node';
 import { Tag } from '@custom-interfaces/tag';
 import { AuthService } from '@core-services/auth/auth.service';
+import { SupabaseService } from '@core-services/supabase/supabase.service';
+import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
-export class BoardDataService implements OnInit{
-
-  _boards: Board[] = [];
+export class BoardDataService implements OnInit {
+  private _boards: Board[] = [];
   activeId!: string;
   activeBoard!: Board;
   renderer!: Renderer2;
+  private boardSubscription?: Subscription;
 
-
-  public get boards() : Board[] {
+  public get boards(): Board[] {
     return this._boards;
-}
+  }
 
-  public set boards(v : Board[]) {
+  public set boards(v: Board[]) {
     this._boards = v;
   }
 
@@ -45,7 +44,8 @@ export class BoardDataService implements OnInit{
     private router: Router,
     private cookieService: CookieService,
     private cookiesService: CookiesService,
-    private authService: AuthService
+    private authService: AuthService,
+    private supabaseService: SupabaseService
   ) {
     // Initialize boards array
     this._boards = [];
@@ -61,6 +61,8 @@ export class BoardDataService implements OnInit{
         const selectedBoard = this.boards.find(e => e.id === this.activeId);
         if (selectedBoard) {
           this.activeBoard = selectedBoard;
+          // Subscribe to real-time updates for this board
+          this.subscribeToBoardUpdates(selectedBoard.id);
         }
       }
     });
@@ -71,13 +73,31 @@ export class BoardDataService implements OnInit{
     });
   }
 
-  async deleteAll() {
-    db.boards.clear();
+  private subscribeToBoardUpdates(boardId: string) {
+    // Unsubscribe from previous board updates
+    if (this.boardSubscription) {
+      this.boardSubscription.unsubscribe();
+    }
+
+    // Subscribe to new board updates
+    this.boardSubscription = this.supabaseService.subscribeToBoardChanges(boardId)
+      .subscribe(board => {
+        if (board) {
+          // Update local board data
+          const index = this.boards.findIndex(b => b.id === board.id);
+          if (index !== -1) {
+            this.boards[index] = board;
+            if (this.activeId === board.id) {
+              this.activeBoard = board;
+            }
+          }
+        }
+      });
   }
 
   async loadBoards() {
     try {
-      const boards = await this.getBoards();
+      const boards = await this.supabaseService.getBoards();
       this.boards = boards;
       
       // Get board ID from route params
@@ -93,6 +113,9 @@ export class BoardDataService implements OnInit{
         if (selectedBoard) {
           this.activeBoard = selectedBoard;
           this.activeId = id;
+          
+          // Subscribe to real-time updates for this board
+          this.subscribeToBoardUpdates(selectedBoard.id);
           
           // If board is accepted, apply restrictions immediately
           if (selectedBoard.accepted) {
@@ -111,43 +134,7 @@ export class BoardDataService implements OnInit{
             // Disable all nodes
             const nodes = document.querySelectorAll('.nodeContainer');
             nodes.forEach(node => {
-              if (node instanceof HTMLElement) {
-                // Add no-interact class to disable all interactions
-                this.renderer.addClass(node, 'no-interact');
-                
-                // Disable text editing
-                const textarea = node.querySelector('.desc');
-                if (textarea instanceof HTMLElement) {
-                  this.renderer.setAttribute(textarea, 'readonly', '');
-                  this.renderer.setAttribute(textarea, 'disabled', '');
-                  this.renderer.addClass(textarea, 'no-interact');
-                }
-                
-                // Hide resize and link buttons
-                const resizeButton = node.querySelector('.resizeButton');
-                const linkButton = node.querySelector('.linkActionButton');
-                if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
-                if (linkButton) this.renderer.addClass(linkButton, 'hidden');
-                
-                // Disable dragging by adding no-drag class
-                this.renderer.addClass(node, 'no-drag');
-              }
-            });
-            
-            // Disable all connections by adding no-interact class
-            const connections = document.querySelectorAll('.jtk-connector');
-            connections.forEach(conn => {
-              if (conn instanceof HTMLElement) {
-                this.renderer.addClass(conn, 'no-interact');
-              }
-            });
-            
-            // Disable all endpoints
-            const endpoints = document.querySelectorAll('.jtk-endpoint');
-            endpoints.forEach(endpoint => {
-              if (endpoint instanceof HTMLElement) {
-                this.renderer.addClass(endpoint, 'no-interact');
-              }
+              this.renderer.addClass(node, 'disabled');
             });
           }
         } else {
@@ -176,11 +163,6 @@ export class BoardDataService implements OnInit{
     }
   }
 
-  async getBoards():Promise<Board[]> {
-    const boards = await db.boards.toArray();
-    return boards;
-  }
-
   getBoard(id: string, projectId?: string) {
     if (projectId) {
       return this.boards.find(e => e.id === id && e.projectId === projectId);
@@ -190,6 +172,137 @@ export class BoardDataService implements OnInit{
 
   getBoardsByProject(projectId: string): Board[] {
     return this.boards.filter(board => board.projectId === projectId);
+  }
+
+  async saveData() {
+    // Check if cookies are accepted
+    if (!this.cookiesService.accepted) {
+      const cookiesAccepted = await this.checkAndAcceptCookies();
+      if (!cookiesAccepted) {
+        return false;
+      }
+    }
+
+    try {
+      const id = this.activatedRoute.snapshot.queryParamMap.get('id');
+      const projectId = history.state?.projectId;
+      
+      if (!id) {
+        console.warn('No board ID found for saving');
+        return false;
+      }
+      
+      let board = projectId 
+        ? this.getBoard(id, projectId)
+        : this.getBoard(id);
+        
+      if (!board) {
+        console.warn('No board found with ID:', id);
+        return false;
+      }
+
+      // Create a new board object to prevent reference issues
+      const boardToSave = {
+        ...board,
+        projectId: board.projectId,
+        elements: [],
+        groups: [],
+        connetions: [],
+        accepted: board.accepted
+      };
+
+      // Save current state
+      this.saveConnections(boardToSave);
+      this.saveNodes(boardToSave);
+      boardToSave.zoomScale = this.boardService.panzoom.getScale();
+
+      // Update in Supabase
+      try {
+        await this.supabaseService.updateBoard(boardToSave.id, boardToSave);
+        
+        // Update local state
+        const index = this.boards.findIndex(b => b.id === boardToSave.id);
+        if (index !== -1) {
+          this.boards[index] = boardToSave;
+        }
+
+        console.log('Board saved successfully:', boardToSave.id);
+        return true;
+      } catch (error) {
+        console.error('Error saving board to Supabase:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving board data:', error);
+      return false;
+    }
+  }
+
+  createBoard(board?: Board, clearNotes?: boolean, projectId?: string): string {
+    const id = uuid();
+
+    const newBoard = board ? {
+      id,
+      projectId: projectId ?? board.projectId,
+      dateCreated: board.dateCreated,
+      name: board.name,
+      connetions: board.connetions,
+      elements: board.elements,
+      groups: board.groups,
+      zoomScale: 1,
+      favorite: board.favorite,
+      tag: board.tag,
+      accepted: board.accepted
+    } : {
+      id,
+      projectId,
+      dateCreated: new Date(),
+      name: `Untitled board`,
+      connetions: [],
+      elements: [],
+      groups: [],
+      zoomScale: 1,
+      accepted: false
+    };
+    
+    // Save to Supabase
+    this.supabaseService.createBoard(newBoard).then(savedBoard => {
+      this.boards.push(savedBoard);
+    }).catch(error => {
+      console.error('Error creating board:', error);
+    });
+
+    if(clearNotes && this.boardService && this.boardService.instance) {
+      try {
+        this.nodeService.clearAll();
+      } catch (error) {
+        console.error('Error clearing notes:', error);
+      }
+    }
+
+    return id;
+  }
+
+  async deleteBoard(id: string) {
+    try {
+      await this.supabaseService.deleteBoard(id);
+      this.boards = this.boards.filter(board => board.id !== id);
+    } catch (error) {
+      console.error('Error deleting board:', error);
+      throw error;
+    }
+  }
+
+  async editBoardName(id: string, name: string) {
+    try {
+      const updatedBoard = await this.supabaseService.updateBoard(id, { name });
+      this.boards = this.boards.map(board => 
+        board.id === id ? updatedBoard : board
+      );
+    } catch (error) {
+      console.error('Error updating board name:', error);
+      throw error;
+    }
   }
 
   async checkData(renderer: Renderer2) {
@@ -226,19 +339,19 @@ export class BoardDataService implements OnInit{
             // Disable text editing
             const textarea = node.querySelector('.desc');
             if (textarea instanceof HTMLElement) {
-              renderer.setAttribute(textarea, 'readonly', '');
-              renderer.setAttribute(textarea, 'disabled', '');
-              renderer.addClass(textarea, 'no-interact');
+              this.renderer.setAttribute(textarea, 'readonly', '');
+              this.renderer.setAttribute(textarea, 'disabled', '');
+              this.renderer.addClass(textarea, 'no-interact');
             }
             
             // Hide resize and link buttons
             const resizeButton = node.querySelector('.resizeButton');
             const linkButton = node.querySelector('.linkActionButton');
-            if (resizeButton) renderer.addClass(resizeButton, 'hidden');
-            if (linkButton) renderer.addClass(linkButton, 'hidden');
+            if (resizeButton) this.renderer.addClass(resizeButton, 'hidden');
+            if (linkButton) this.renderer.addClass(linkButton, 'hidden');
             
             // Disable dragging by adding no-drag class
-            renderer.addClass(node, 'no-drag');
+            this.renderer.addClass(node, 'no-drag');
           }
         });
         
@@ -246,7 +359,7 @@ export class BoardDataService implements OnInit{
         const connections = document.querySelectorAll('.jtk-connector');
         connections.forEach(conn => {
           if (conn instanceof HTMLElement) {
-            renderer.addClass(conn, 'no-interact');
+            this.renderer.addClass(conn, 'no-interact');
           }
         });
         
@@ -254,7 +367,7 @@ export class BoardDataService implements OnInit{
         const endpoints = document.querySelectorAll('.jtk-endpoint');
         endpoints.forEach(endpoint => {
           if (endpoint instanceof HTMLElement) {
-            renderer.addClass(endpoint, 'no-interact');
+            this.renderer.addClass(endpoint, 'no-interact');
           }
         });
       }
@@ -382,201 +495,6 @@ export class BoardDataService implements OnInit{
     }
   }
 
-  createBoard(board?: Board, clearNotes?: boolean, projectId?: string): string {
-    const id = uuid();
-
-    if(board) {
-      const newBoard = {
-        id,
-        projectId: projectId ?? board.projectId,
-        dateCreated: board.dateCreated,
-        name: board.name,
-        connetions: board.connetions,
-        elements: board.elements,
-        groups: board.groups,
-        zoomScale: 1,
-        favorite: board.favorite,
-        tag: board.tag,
-        accepted: board.accepted
-      };
-      
-      this.boards.push(newBoard);
-      db.boards.add(newBoard);
-    } else {
-      const newBoard = {
-        id,
-        projectId,
-        dateCreated: new Date(),
-        name: `Untitled board`,
-        connetions: [],
-        elements: [],
-        groups: [],
-        zoomScale: 1,
-        accepted: false
-      };
-      
-      this.boards.push(newBoard);
-      db.boards.add(newBoard);
-    }
-
-    if(clearNotes && this.boardService && this.boardService.instance) {
-      try {
-        this.nodeService.clearAll();
-      } catch (error) {
-        console.error('Error clearing notes:', error);
-      }
-    }
-
-    return id;
-  }
-
-  createBoardFromTemplate(
-    template:
-    "sprint-retro" |
-    "kanban" |
-    "useCase" |
-    "sprint-retro2"
-  ) {
-
-    let templateBoard: TemplateBoard = kanban;
-
-    switch (template) {
-      case "sprint-retro":
-        templateBoard = sprintRetro;
-        break;
-
-      case "sprint-retro2":
-        templateBoard = sprintRetro2;
-        break;
-
-      case "useCase":
-        templateBoard = useCase;
-        break;
-
-      case "kanban":
-        templateBoard = kanban;
-        break;
-      default:
-
-        break;
-    }
-
-    const id = uuid();
-    this.boards.push({
-      id,
-      dateCreated: new Date(),
-      name: templateBoard.name,
-      connetions: templateBoard.connetions,
-      elements: templateBoard.elements,
-      groups: templateBoard.groups,
-      zoomScale: templateBoard.zoomScale,
-    })
-
-    this.router.navigate(['/board'], {
-      queryParams: {
-        id,
-      }
-    })
-
-  }
-
-  isCookiesAccepted(): boolean {
-    return this.cookiesService.accepted;
-  }
-
-  async checkAndAcceptCookies(): Promise<boolean> {
-    if (!this.cookiesService.accepted) {
-      try {
-        this.cookiesService.accepted = true;
-        // Wait a moment for the cookie to be set
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return true;
-      } catch (error) {
-        console.error('Error accepting cookies:', error);
-        return false;
-      }
-    }
-    return true;
-  }
-
-  async saveData() {
-    // Check if cookies are accepted
-    if (!this.cookiesService.accepted) {
-      const cookiesAccepted = await this.checkAndAcceptCookies();
-      if (!cookiesAccepted) {
-        return false;
-      }
-    }
-
-    try {
-      const id = this.activatedRoute.snapshot.queryParamMap.get('id');
-      const projectId = history.state?.projectId;
-      
-      if (!id) {
-        console.warn('No board ID found for saving');
-        return false;
-      }
-      
-      let board = projectId 
-        ? this.getBoard(id, projectId)
-        : this.getBoard(id);
-        
-      if (!board) {
-        console.warn('No board found with ID:', id);
-        return false;
-      }
-
-      // Create a new board object to prevent reference issues
-      const boardToSave = {
-        ...board,
-        projectId: board.projectId, // Ensure projectId is preserved
-        elements: [],
-        groups: [],
-        connetions: [],
-        accepted: board.accepted // Preserve the accepted state
-      };
-
-      // Save current state
-      this.saveConnections(boardToSave);
-      this.saveNodes(boardToSave);
-      boardToSave.zoomScale = this.boardService.panzoom.getScale();
-
-      // Update or add to database
-      try {
-        const boardInDb = await db.boards.get(boardToSave.id);
-        if (boardInDb) {
-          await db.boards.update(boardToSave.id, {
-            name: boardToSave.name,
-            projectId: boardToSave.projectId,
-            connetions: boardToSave.connetions,
-            elements: boardToSave.elements,
-            groups: boardToSave.groups,
-            zoomScale: boardToSave.zoomScale,
-            dateCreated: boardToSave.dateCreated,
-            accepted: boardToSave.accepted // Include accepted state in update
-          });
-        } else {
-          await db.boards.add(boardToSave);
-        }
-
-        // Update local state
-        const index = this.boards.findIndex(b => b.id === boardToSave.id);
-        if (index !== -1) {
-          this.boards[index] = boardToSave;
-        }
-
-        console.log('Board saved successfully:', boardToSave.id);
-        return true;
-      } catch (dbError) {
-        console.error('Database error while saving board:', dbError);
-        return false;
-      }
-    } catch (error) {
-      console.error('Error saving board data:', error);
-      return false;
-    }
-  }
-
   saveConnections(board: Board) {
     if (!this.boardService.instance) return;
     try {
@@ -699,17 +617,6 @@ export class BoardDataService implements OnInit{
     return this.getData(this.activeId);
   }
 
-  deleteBoard(id: string) {
-    let newBoards: Board[] = this.boards.filter((board: Board)=>{
-      if(board.id === id) {
-        return false;
-      }
-      return true;
-    })
-    this.boards = newBoards;
-    db.boards.delete(id);
-  }
-
   toggleFavorite(id: string) {
 
     let newBoards: Board[] = this.boards.map(element=>{
@@ -721,29 +628,12 @@ export class BoardDataService implements OnInit{
           element.favorite = true;
         }
 
-        db.boards.update(id, {
+        this.supabaseService.updateBoard(id, {
           favorite: element.favorite
         });
       }
       return element
     })
-
-    this.boards = newBoards;
-  }
-
-  editBoardName(id: string, name: string) {
-    let newBoards: Board[] = this.boards.map((board: Board)=>{
-      if(board.id === id) {
-        return {
-          ...board,
-          name,
-        }
-      }
-      return board
-    })
-    db.boards.update(id, {
-      name,
-    });
 
     this.boards = newBoards;
   }
@@ -761,5 +651,30 @@ export class BoardDataService implements OnInit{
 
   ngOnInit(): void {
     this.activeId = this.activatedRoute.snapshot.paramMap.get('id') ?? 'null';
+  }
+
+  ngOnDestroy() {
+    if (this.boardSubscription) {
+      this.boardSubscription.unsubscribe();
+    }
+  }
+
+  isCookiesAccepted(): boolean {
+    return this.cookiesService.accepted;
+  }
+
+  async checkAndAcceptCookies(): Promise<boolean> {
+    if (!this.cookiesService.accepted) {
+      try {
+        this.cookiesService.accepted = true;
+        // Wait a moment for the cookie to be set
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return true;
+      } catch (error) {
+        console.error('Error accepting cookies:', error);
+        return false;
+      }
+    }
+    return true;
   }
 }
