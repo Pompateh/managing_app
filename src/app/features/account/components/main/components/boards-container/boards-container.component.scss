@@ -1,0 +1,31 @@
+.boardsCard-container {
+  @apply shadow rounded py-4 px-6 min-h-60 flex flex-col mb-10 bg-background-base-50 border-[1px] border-background-400;
+
+  @media screen and (max-width: 768px) {
+    @apply px-2;
+  }
+}
+
+.board-card-container {
+  @apply my-2 h-full;
+
+  @media screen and (max-width: 768px) {
+    @apply my-1;
+  }
+}
+
+.sub-container{
+  @apply rounded shadow flex flex-row items-center;
+}
+
+.flex-row-center {
+  @apply flex flex-row items-center;
+}
+
+.all-center {
+  @apply flex justify-center items-center;
+}
+
+.edit-modal {
+  @apply p-4;
+}

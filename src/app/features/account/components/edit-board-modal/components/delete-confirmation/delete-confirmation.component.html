@@ -1,0 +1,21 @@
+<div id="delete-container">
+<h1 class="sub-title-xl mb-4 !font-normal">{{data ? data.text : 'Delete board?'}}</h1>
+<div id="buttons">
+  <app-simple-button
+    class="closeButton"
+    mat-dialog-close
+    [customStyles]="'!w-full'"
+    [text]="'Cancel'"
+    [elementType]="'button'"
+    [theme]="'btn-secondary'">
+  </app-simple-button>
+  <app-simple-button
+    class="closeButton"
+    mat-dialog-close="DELETE"
+    [customStyles]="'!w-full'"
+    [text]="'Confirm'"
+    [elementType]="'button'"
+    [theme]="'btn-warn'">
+  </app-simple-button>
+</div>
+</div>

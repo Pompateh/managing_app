@@ -1,0 +1,42 @@
+<ng-container *ngIf="elementType === 'a'; else buttonType" class="{{customStyles}} w-full" >
+  <ng-container *ngIf="routerLink; else ahref">
+    <a
+      [id]="id"
+      [routerLink]="['/',routerLink]"
+
+      [href]="url"
+      class="btn {{theme}} {{customStyles}}">
+        <mat-icon [svgIcon]="icon" class="icon me-2 !p-0" *ngIf="icon" style="height: 18px;"></mat-icon>
+        <p class="{{textCustomStyles}}">{{text}}</p>
+    </a>
+  </ng-container>
+  <ng-template #ahref>
+    <a
+      [id]="id"
+      href="{{url}}"
+      target="_blank"
+      class="btn {{theme}} {{customStyles}}">
+        <mat-icon [svgIcon]="icon" class="icon me-2 !p-0" *ngIf="icon" style="height: 18px;"></mat-icon>
+        <p class="{{textCustomStyles}}">{{text}}</p>
+    </a>
+  </ng-template>
+</ng-container>
+
+<ng-template #buttonType>
+
+  <ng-container *ngIf="elementType === 'button'; else submitType">
+    <button
+      [id]="id"
+      class="btn {{theme}} {{customStyles}}">
+      <p class="{{textCustomStyles}}">{{text}}</p>
+    </button>
+  </ng-container>
+
+  <ng-template #submitType>
+    <input
+      [id]="id"
+      type="submit" value="{{text}}"
+      class="btn {{theme}} {{customStyles}} ">
+  </ng-template>
+
+</ng-template>

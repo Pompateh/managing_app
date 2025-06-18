@@ -1,0 +1,56 @@
+.btn {
+  @apply rounded-full px-8 py-3 mx-1 shadow text-center flex items-center justify-center text-[0.9rem] box-border;
+
+  &:hover {
+    @apply transition-all;
+    filter: brightness(92%);
+    cursor: pointer;
+  }
+}
+
+.btn-primary {
+  @apply bg-primary-base-600 transition-all;
+
+  .icon {
+    filter: invert(100%)
+  }
+
+  p {
+    @apply text-text-100;
+  }
+
+  &:hover {
+    @apply bg-primary-700 filter-none;
+  }
+}
+
+.btn-secondary {
+  @apply border-[1px] border-text-300 transition-all box-border;
+
+  p {
+    @apply text-text-base-900;
+  }
+
+  &:hover {
+    @apply bg-background-200 filter-none;
+  }
+}
+
+.btn-warn {
+  @apply bg-alert-base-900 transition-all;
+
+  p {
+    @apply text-text-100;
+  }
+
+  .icon {
+    filter: invert(100%)
+  }
+
+  &:hover {
+    @apply bg-alert-800 filter-none;
+  }
+}
+
+
+

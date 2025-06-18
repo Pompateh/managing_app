@@ -1,0 +1,82 @@
+//? Since all nodes are created after an action, the styles are in the global file '/src/styles.scss'
+
+.image-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.node-image {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  display: block;
+}
+
+// Add styles for image node container
+:host(.imageNode) {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  .resizeButton, .linkActionButton {
+    z-index: 2;
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    opacity: 0.7;
+    background: rgba(255,255,255,0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .resizeButton {
+    right: 0;
+    bottom: 0;
+  }
+  .linkActionButton {
+    left: 0;
+    top: 0;
+  }
+  .dragDiv {
+    display: none !important;
+  }
+}
+
+.no-interact {
+  pointer-events: none !important;
+  user-select: none !important;
+  opacity: 0.7;
+  background: #f5f5f5;
+}
+.no-interact * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.no-select {
+  pointer-events: none !important;
+  user-select: none !important;
+  opacity: 0.7;
+  background: #f5f5f5;
+}
+.no-select * {
+  pointer-events: none !important;
+  user-select: none !important;
+}

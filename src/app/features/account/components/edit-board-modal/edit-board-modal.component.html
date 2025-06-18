@@ -1,0 +1,33 @@
+<div class="flex flex-col justify-between w-full h-full bg-background-base-50 p-6">
+  <div class="flex flex-row items-center">
+    <h2 class="font-bold text-xl">Edit board</h2>
+    <button (click)="confirmDelete()" class="flex items-center justify-center ms-2">
+      <mat-icon svgIcon="trash"></mat-icon>
+    </button>
+  </div>
+  <div id="nameInput-container">
+    <label for="name" id="label">Board name: </label>
+    <input type="text" name="name" id="name" #inputName (input)="setNewName($event)">
+  </div>
+  <div id="buttons">
+    <app-simple-button
+    [customStyles]="'!w-full !m-0'"
+    class="closeButton"
+    [text]="'Close'"
+    [elementType]="'button'"
+    [theme]="'btn-secondary'"
+    mat-dialog-close>
+    </app-simple-button>
+    <app-simple-button
+    [customStyles]="'!m-0 !w-full'"
+    class="closeButton"
+    [text]="'Confirm'"
+    [elementType]="'button'"
+    [theme]="'btn-primary'"
+    [mat-dialog-close]="{
+      id: data.id,
+      value: newValue,
+    }">
+    </app-simple-button>
+  </div>
+</div>

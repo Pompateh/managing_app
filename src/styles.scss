@@ -1,0 +1,323 @@
+// Custom Theming for Angular Material
+// For more information: https://material.angular.io/guide/theming
+@use '@angular/material' as mat;
+// Plus imports for other components in your app.
+
+// Include the common styles for Angular Material. We include this here so that you only
+// have to load a single css file for Angular Material in your app.
+// Be sure that you only ever include this mixin once!
+@include mat.core();
+
+// Define the palettes for your theme using the Material Design palettes available in palette.scss
+// (imported above). For each palette, you can optionally specify a default, lighter, and darker
+// hue. Available color palettes: https://material.io/design/color/
+$mnos-primary: mat.define-palette(mat.$indigo-palette);
+
+$mnos-accent: mat.define-palette(mat.$pink-palette, A200, A100, A400);
+
+// The warn palette is optional (defaults to red).
+$mnos-warn: mat.define-palette(mat.$red-palette);
+
+// Create the theme object. A theme consists of configurations for individual
+// theming systems such as "color" or "typography".
+$mnos-theme: mat.define-light-theme((
+  color: (
+    primary: $mnos-primary,
+    accent: $mnos-accent,
+    warn: $mnos-warn,
+  ),
+  typography: mat.define-typography-config(),
+  density: 0
+));
+
+// Include theme styles for core and each component used in your app.
+// Alternatively, you can import and @include the theme mixins for each component
+// that you are using.
+@include mat.all-component-themes($mnos-theme);
+
+html, body { height: 100%; }
+
+:root {
+
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply text-text-base-900;
+  font-family: "Inter", sans-serif !important;
+}
+
+
+.centerItems {
+  @apply flex justify-center items-center;
+}
+
+.jtk-connector {
+  z-index:4;
+}
+.jtk-endpoint {
+  z-index:5;
+}
+.jtk-overlay {
+  z-index:6;
+}
+
+.nodeContainer {
+  @apply min-w-48 max-w-56 min-h-12 max-h-44 bg-background-base-50 absolute p-2 box-border rounded shadow;
+
+  &:hover {
+    @apply shadow-md;
+  }
+
+  &:active {
+    @apply shadow-xl;
+  }
+
+  .desc {
+    @apply text-base w-full overflow-hidden resize-none h-full bg-transparent outline-none text-justify;
+  }
+
+  .desc::placeholder {
+    @apply opacity-50 text-text-base-900;
+  }
+
+  .fadeDiv {
+    @apply w-full h-4 absolute bottom-0 left-0;
+  }
+
+.dragDiv {
+  @apply w-full h-full absolute top-0 left-0 opacity-30;
+}
+
+.resizeButton {
+  @apply  bg-background-500 bg-opacity-50 w-4 h-4 rounded absolute bottom-0 right-0 cursor-nw-resize transition-all centerItems;
+
+  &:hover {
+    @apply bg-background-600 bg-opacity-50 transition-all;
+  }
+
+  .mat-icon {
+    vertical-align: middle;
+  }
+
+}
+
+
+.linkActionButton {
+  @layer linkAction;
+  @apply bg-background-600 bg-opacity-50 w-4 h-4 -m-5 rounded absolute transition-all centerItems;
+
+  &:hover {
+    @apply w-5 h-5 transition-all bg-background-500 bg-opacity-50;
+  }
+}
+
+}
+
+.labelConnection {
+  @apply bg-background-base-50 rounded shadow py-2 px-1 outline-none text-center min-w-20 max-w-60;
+}
+
+.nodeGroup {
+  @apply max-h-[2000px] max-w-[2000px];
+}
+
+.activeNode {
+  @apply border-2 border-black;
+  z-index: 8;
+
+  &:has(.nodeContainer) {
+    z-index: 3;
+  }
+}
+
+.controlTools {
+  @apply shadow p-1 m-2 rounded transition-all flex justify-center items-center border-[1px] border-background-400;
+
+  &:hover {
+    @apply shadow-lg transition-all;
+  }
+}
+
+.grab {
+  @apply shadow transition-all m-2 flex justify-center items-center;
+  cursor: move;
+  cursor: grab;
+  cursor: -moz-grab;
+  cursor: -webkit-grab;
+  .thumbnails-list{
+      cursor: pointer;
+  }
+
+  &:hover {
+    @apply shadow-lg transition-all;
+  }
+
+  &:active {
+    cursor: grabbing;
+    cursor: -moz-grabbing;
+    cursor: -webkit-grabbing;
+  }
+}
+
+.main-title {
+  @apply text-center font-bold text-4xl;
+}
+
+.sub-title-3xl {
+  @apply text-center font-bold text-3xl;
+}
+
+.sub-title-2xl {
+  @apply text-center font-bold text-2xl;
+}
+
+.sub-title-xl {
+  @apply text-center font-bold text-xl;
+}
+
+.base-text {
+  @apply text-center text-lg;
+}
+
+.bg-visible {
+  @apply bg-transparent;
+}
+
+#logo {
+  object-fit: cover;
+  width: 30px;
+  height: 50px;
+}
+
+.bg-blob-nude {
+  background-image: url('assets/images/bg-blob-single-nude.svg');
+  background-position: bottom;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+//? Icon coloring
+
+  .icon-white {
+    filter: invert(100%)
+  }
+
+  .icon-background-400 {
+    filter: brightness(0) saturate(100%) invert(78%) sepia(13%) saturate(286%) hue-rotate(207deg) brightness(81%) contrast(82%);
+  }
+
+  .icon-warn {
+    filter: brightness(0) saturate(100%) invert(11%) sepia(92%) saturate(4605%) hue-rotate(358deg) brightness(106%) contrast(117%);
+  }
+
+  .icon-accent {
+    filter: brightness(0) saturate(100%) invert(69%) sepia(92%) saturate(1182%) hue-rotate(327deg) brightness(103%) contrast(95%);
+  }
+
+//?
+
+//? Shared navbar
+  .menuButton { //shared navbar menu button
+    @apply block w-full my-1 p-2 text-start font-semibold rounded transition-all;
+
+    &:hover {
+      @apply bg-background-300 transition-all;
+    }
+  }
+
+  .menuItem { //shared navbar menu button
+    @apply block w-full my-1 p-2 text-start font-semibold rounded transition-all;
+
+  }
+
+//?
+
+//?
+
+//? Blog
+
+.mdc-tab__text-label {
+  transition: 100ms !important;
+}
+
+.mat-mdc-tab-group {
+	--mdc-tab-indicator-active-indicator-color: #4e0bf7; //primary
+}
+
+.mdc-tab--active .mdc-tab__text-label{
+  color: #4e0bf7 !important;
+}
+
+
+//?
+
+.cookieModal {
+  @apply w-[50vw];
+
+  @media screen and (max-width: 1000px)  {
+    @apply w-[90vw] my-2 overflow-scroll text-[0.9rem];
+  }
+}
+
+
+.buttonHover {
+  @apply transition-all rounded;
+
+  &:hover {
+    @apply bg-background-200 transition-all rounded;
+  }
+}
+
+//? Snack bar
+.mat-mdc-snack-bar-container .mdc-snackbar__surface {
+  background: #fffdf6 !important;
+}
+
+.mdc-snackbar--open .mdc-snackbar__label{
+  color: #050115 !important;
+}
+
+
+//? Markdown to HTML configuration
+#markdown {
+
+  h1 {
+    @apply font-semibold text-2xl;
+  }
+
+  h2 {
+    @apply font-semibold text-xl;
+  }
+
+  h3 {
+    @apply font-semibold text-lg;
+  }
+
+  p {
+    @apply text-justify;
+  }
+
+  a {
+    @apply underline font-semibold;
+  }
+
+  ul {
+    @apply ps-6;
+
+    li {
+      list-style-type: disc;
+    }
+  }
+}
+
+.imageNode.activeNode {
+  background: transparent !important;
+  box-shadow: 0 0 0 2px #000;
+}
+
+
+
