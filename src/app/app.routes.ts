@@ -11,6 +11,7 @@ import { authGuard } from './core/guards/auth.guard';
 import { ProjectListComponent } from './features/project-list/project-list.component';
 import { ProjectDetailsComponent } from './features/project-details/project-details.component';
 import { UserRole } from './core/models/user.model';
+import { MigrationComponent } from './features/migration/migration.component';
 
 export const routes: Routes = [
   {
@@ -71,6 +72,12 @@ export const routes: Routes = [
     component: BoardComponent,
     canActivate: [authGuard],
     data: { roles: [UserRole[UserRole.ADMIN], UserRole[UserRole.MEMBER], UserRole[UserRole.VIEWER]] }
+  },
+  {
+    path: 'migration',
+    component: MigrationComponent,
+    canActivate: [authGuard],
+    data: { roles: [UserRole[UserRole.ADMIN]] }
   },
   {
     path: '**',

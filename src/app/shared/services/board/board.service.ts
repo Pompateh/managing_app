@@ -424,7 +424,7 @@ export class BoardService {
       const nodeCreator = (abstractElement as HTMLElement).dataset['createdByUserId'];
       const isViewer = this.isViewer;
       const currentUser = this.currentUserEmail;
-      const isAccepted = boardData.activeBoard?.accepted;
+      const isAccepted = boardData.getActiveBoard()?.accepted;
 
       if (
         desc &&
@@ -448,7 +448,7 @@ export class BoardService {
     })
 
     this.instance.bind(jsplumb.INTERCEPT_BEFORE_DROP, (params: jsplumb.BeforeDropParams) => {
-      if (this.boardData.activeBoard?.accepted) return false;
+      if (this.boardData.getActiveBoard()?.accepted) return false;
       
       // Restrict viewers: only allow connecting their own nodes
       if (this.isViewer) {
@@ -590,13 +590,13 @@ export class BoardService {
 
     const jsInstance = jsplumb.newInstance({
       container: abstractElement.nativeElement,
-      elementsDraggable: !boardData.activeBoard?.accepted, // Disable dragging if board is accepted
+      elementsDraggable: !boardData.getActiveBoard()?.accepted, // Disable dragging if board is accepted
       allowNestedGroups: false
     });
     this.instance = jsInstance;
 
     // If board is accepted, disable all interactions
-    if (boardData.activeBoard?.accepted) {
+    if (boardData.getActiveBoard()?.accepted) {
       console.log('[DEBUG] Board is accepted, disabling all interactions');
       // Disable panzoom
       this.disablePanzoom();

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { SimpleFormComponent } from '@shared-components/simple-form';
-import { AuthService } from '../../../../core/services/auth/auth.service';
+import { SupabaseAuthService } from '../../../../core/services/supabase/supabase-auth.service';
 import { CommonModule } from '@angular/common';
 import { UserRole } from '../../../../core/models/user.model';
 
@@ -18,7 +18,7 @@ export class LoginComponent implements OnInit {
   loading: boolean = false;
 
   constructor(
-    private authService: AuthService,
+    private authService: SupabaseAuthService,
     private router: Router,
     private route: ActivatedRoute
   ) {}

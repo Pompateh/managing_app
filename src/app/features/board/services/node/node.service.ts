@@ -4,6 +4,7 @@ import { NgElement, WithProperties } from '@angular/elements';
 import { NodeComponent } from '../../components/node/node.component';
 import { NodeGroupComponent } from '../../components/node-group/node-group.component';
 import { Connection, UIGroup } from '@jsplumb/browser-ui';
+import { BoardDataService } from '../../../../shared/services/board-data/board-data.service';
 
 
 @Injectable({
@@ -46,6 +47,7 @@ export class NodeService {
     private boardService: BoardService,
     private injector: EnvironmentInjector,
     private applicationRef: ApplicationRef,
+    private boardData: BoardDataService
   ) {}
 
   setNodes(newNodes: ArrayLike<any>) {
@@ -123,7 +125,7 @@ export class NodeService {
 
     // Pass isAccepted - safely handle undefined boardData
     if (nodeComponentRef.instance.constructor.name === 'NodeComponent') {
-      (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData?.activeBoard?.accepted ?? false;
+      (nodeComponentRef.instance as any).isAccepted = this.boardData.getActiveBoard()?.accepted ?? false;
     }
 
     let top = (y/this.boardService.zoomScale)-this.boardService.translation.y
@@ -153,6 +155,7 @@ export class NodeService {
       // Pass isViewer
       (nodeComponentRef.instance as any).isViewer = this.boardService.isViewer;
       // Pass isAccepted
+      (nodeComponentRef.instance as any).isAccepted = this.boardData.getActiveBoard()?.accepted || false;
       (nodeComponentRef.instance as any).isAccepted = this.boardService.boardData.activeBoard?.accepted || false;
       console.log('[DEBUG] Creating node with currentUserEmail:', this.boardService.currentUserEmail);
     }

@@ -5,6 +5,7 @@ import { SimpleButtonComponent } from '@shared-components/simple-button';
 import { BoardDataService } from '@shared-services/board-data/board-data.service';
 import { DeleteConfirmationComponent } from './components/delete-confirmation/delete-confirmation.component';
 import { IconService } from '@shared-services/icon/icon.service';
+import { Board } from '../../../../core/models/interfaces/board';
 
 @Component({
   selector: 'account-edit-board-modal',
@@ -56,9 +57,10 @@ export class EditBoardModalComponent implements AfterViewInit{
 
   ngAfterViewInit(): void {
     const abstractInput:HTMLInputElement = this.renderer.selectRootElement(this.inputName.nativeElement,true);
-    let selectedBoard = this.boardData.getData(this.data.id);
-    if(selectedBoard)
-    this.renderer.setAttribute(abstractInput,"value",selectedBoard.name);
+    const selectedBoard = this.boardData.getData(this.data.id) as Board | undefined;
+    if (selectedBoard) {
+      this.renderer.setAttribute(abstractInput, "value", (selectedBoard as Board).name);
+    }
 
   }
 }

@@ -18,6 +18,7 @@ import { AuthService } from '@core-services/auth/auth.service';
 import { MatDialog } from '@angular/material/dialog';
 import { BoardNavbarComponent } from '../../components/board-navbar/board-navbar.component';
 import { Connection } from '@jsplumb/browser-ui';
+import { Board } from '../../../../core/models/interfaces/board';
 
 @Component({
   selector: 'app-board',
@@ -180,7 +181,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   isViewer: boolean = false;
   isAccepted: boolean = false;
-  currentUserEmail: string = '';
+  currentUserEmail: string | null = null;
   showDoneDialog: boolean = false;
 
   constructor(
@@ -238,7 +239,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     const user = this.authService.getCurrentUser();
     this.isViewer = user?.role === 'VIEWER';
     this.currentUserEmail = user?.email ? user.email : '';
-    this.isAccepted = !!this.boardData.activeBoard?.accepted;
+    this.isAccepted = !!this.boardData.getActiveBoard()?.accepted;
     
     // If board is accepted, apply restrictions immediately
     if (this.isAccepted) {
@@ -300,6 +301,8 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
     // Pass to BoardService for connection restrictions
     this.boardService.currentUserEmail = this.currentUserEmail;
     this.boardService.isViewer = this.isViewer;
+
+    this.boardData.initializeBoards();
   }
 
   async ngAfterViewInit() {
@@ -475,31 +478,33 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   confirmAcceptBoard() {
     // Set board as accepted and save
-    if (this.boardData.activeBoard) {
-      this.boardData.activeBoard.accepted = true;
-      this.boardData.activeBoard.acceptedBy = this.currentUserEmail;
-      
-      // Update the board in the local boards array
-      const boardIndex = this.boardData.boards.findIndex(b => b.id === this.boardData.activeBoard.id);
-      if (boardIndex !== -1) {
-        this.boardData.boards[boardIndex] = { ...this.boardData.activeBoard };
-      }
-      
-      // Force save immediately
-      this.boardData.saveData().then(() => {
-        console.log('[DEBUG] Board saved as accepted');
-        
-        // Add notification for admin
-        const notifications = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
-        notifications.push({
-          type: 'concept_mood_accepted',
-          boardId: this.boardData.activeBoard.id,
-          acceptedBy: this.currentUserEmail,
-          date: new Date().toISOString()
-        });
-        localStorage.setItem('admin_notifications', JSON.stringify(notifications));
-        
-        // Set board as read-only for all users
+    if (this.boardData.getActiveBoard()) {
+      const activeBoard = this.boardData.getActiveBoard();
+      if (
+        activeBoard &&
+        typeof activeBoard.id === 'string' &&
+        activeBoard.dateCreated &&
+        Array.isArray(activeBoard.connetions) &&
+        typeof activeBoard.name === 'string' &&
+        Array.isArray(activeBoard.elements) &&
+        Array.isArray(activeBoard.groups) &&
+        typeof activeBoard.zoomScale === 'number'
+      ) {
+        const updatedBoard: Board = {
+          id: activeBoard.id,
+          projectId: activeBoard.projectId,
+          dateCreated: activeBoard.dateCreated,
+          connetions: activeBoard.connetions,
+          name: activeBoard.name,
+          elements: activeBoard.elements,
+          groups: activeBoard.groups,
+          zoomScale: activeBoard.zoomScale,
+          tag: activeBoard.tag,
+          favorite: activeBoard.favorite,
+          accepted: true,
+          acceptedBy: this.currentUserEmail || undefined,
+        };
+        this.boardData.updateBoard(updatedBoard);
         this.isAccepted = true;
         this.showDoneDialog = false;
         
@@ -598,9 +603,7 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
             }
           }, 100);
         });
-      }).catch(error => {
-        console.error('[DEBUG] Error saving accepted board:', error);
-      });
+      }
     }
   }
 
@@ -611,5 +614,36 @@ export class BoardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   cancelAcceptBoard() {
     this.showDoneDialog = false;
+  }
+
+  acceptBoard() {
+    const activeBoard = this.boardData.getActiveBoard();
+    if (
+      activeBoard &&
+      typeof activeBoard.id === 'string' &&
+      activeBoard.dateCreated &&
+      Array.isArray(activeBoard.connetions) &&
+      typeof activeBoard.name === 'string' &&
+      Array.isArray(activeBoard.elements) &&
+      Array.isArray(activeBoard.groups) &&
+      typeof activeBoard.zoomScale === 'number'
+    ) {
+      const updatedBoard: Board = {
+        id: activeBoard.id,
+        projectId: activeBoard.projectId,
+        dateCreated: activeBoard.dateCreated,
+        connetions: activeBoard.connetions,
+        name: activeBoard.name,
+        elements: activeBoard.elements,
+        groups: activeBoard.groups,
+        zoomScale: activeBoard.zoomScale,
+        tag: activeBoard.tag,
+        favorite: activeBoard.favorite,
+        accepted: true,
+        acceptedBy: this.currentUserEmail || undefined,
+      };
+      this.boardData.updateBoard(updatedBoard);
+      this.isAccepted = true;
+    }
   }
 }
